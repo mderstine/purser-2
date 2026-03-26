@@ -1,0 +1,26 @@
+[formula]
+name = "spec-intake"
+description = "Intake a raw spec/PRD and produce structured documentation"
+type = "workflow"
+version = "1.0"
+
+[[steps]]
+id = "read"
+title = "Read raw input"
+description = "Read and understand the raw spec, PRD, or feature request"
+needs = []
+
+[[steps]]
+id = "structure"
+title = "Structure the spec"
+description = "Produce a well-structured markdown spec document with all required sections"
+needs = ["read"]
+
+[[steps]]
+id = "link"
+title = "Link to beads"
+description = "Create a bd issue linked to the spec for tracking"
+needs = ["structure"]
+
+[formula.vars]
+source = { description = "Path to raw spec file", required = true }

@@ -1,0 +1,32 @@
+[formula]
+name = "feature"
+description = "Implement a single feature from spec to completion"
+type = "workflow"
+version = "1.0"
+
+[[steps]]
+id = "setup"
+title = "Setup and understand"
+description = "Read the feature issue, understand requirements, set up the environment"
+needs = []
+
+[[steps]]
+id = "implement"
+title = "Implement the feature"
+description = "Write the code, make the changes"
+needs = ["setup"]
+
+[[steps]]
+id = "test"
+title = "Test the implementation"
+description = "Write and run tests to verify the implementation"
+needs = ["implement"]
+
+[[steps]]
+id = "review"
+title = "Self-review"
+description = "Review the changes for quality, security, and completeness"
+needs = ["test"]
+
+[formula.vars]
+feature_id = { description = "BD issue ID of the feature", required = true }

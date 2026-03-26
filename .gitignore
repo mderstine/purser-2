@@ -13,3 +13,6 @@ wheels/
 .dolt/
 *.db
 .beads-credential-key
+
+# Purser runtime
+.purser/

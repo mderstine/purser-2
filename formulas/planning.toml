@@ -1,0 +1,50 @@
+[formula]
+name = "planning"
+description = "Decompose a spec into epics, features, and tasks with dependencies"
+type = "workflow"
+version = "1.0"
+
+[[steps]]
+id = "read-spec"
+title = "Read the specification"
+description = "Load and understand the structured spec document"
+needs = []
+
+[[steps]]
+id = "decompose"
+title = "Decompose into work items"
+description = "Break the spec into epics, features, and tasks with dependency mapping"
+needs = ["read-spec"]
+
+[[steps]]
+id = "create-epic"
+title = "Create epic issue"
+description = "Create the top-level epic in beads"
+needs = ["decompose"]
+
+[[steps]]
+id = "create-features"
+title = "Create feature issues"
+description = "Create feature issues as children of the epic"
+needs = ["create-epic"]
+
+[[steps]]
+id = "create-tasks"
+title = "Create task issues"
+description = "Create task issues as children of their features"
+needs = ["create-features"]
+
+[[steps]]
+id = "wire-deps"
+title = "Wire dependencies"
+description = "Add blocks/discovered-from dependencies between tasks"
+needs = ["create-tasks"]
+
+[[steps]]
+id = "verify"
+title = "Verify plan integrity"
+description = "Check for cycles, orphan tasks, and missing dependencies"
+needs = ["wire-deps"]
+
+[formula.vars]
+spec_id = { description = "ID of the spec to decompose", required = true }
