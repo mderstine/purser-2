@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "purser_2",
+  "project_id": "39eeb48c-f342-46f0-808c-a8ab7b8a078a"
+}
