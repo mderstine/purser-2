@@ -37,35 +37,123 @@ def cli(ctx: click.Context, use_json: bool) -> None:
 
 
 @cli.command()
+@click.option("--check", is_flag=True, help="Check initialization status without modifying")
+@click.option("--force", is_flag=True, help="Force re-initialization")
 @click.pass_context
-def init(ctx: click.Context) -> None:
-    """Initialize purser in the current project."""
+def init(ctx: click.Context, check: bool, force: bool) -> None:
+    """Initialize purser in the current project.
+
+    Creates the directory structure, initializes DuckDB for memory,
+    and sets up beads (Dolt) for issue tracking.
+    """
+    import shutil
+
     from purser.config import load_config
     from purser.memory import MemoryStore
 
     config = load_config()
 
+    # Check mode: just report status
+    if check:
+        _check_init_status(config)
+        return
+
+    # Check if already initialized
+    is_init = _is_initialized(config)
+    if is_init and not force:
+        click.echo("Purser is already initialized. Use --force to re-initialize.")
+        click.echo(f"  Memory DB: {config.memory_db}")
+        click.echo(f"  Specs dir: {config.specs_dir}")
+        click.echo(f"  Beads: {shutil.which('bd') or 'not found'}")
+        return
+
+    if force and is_init:
+        click.echo("Force re-initializing purser...")
+
     # Create directories
     for d in [config.specs_dir, config.formulas_dir, Path(".purser")]:
         d.mkdir(parents=True, exist_ok=True)
+        click.echo(f"Created: {d}")
 
     # Init DuckDB
     mem = MemoryStore(config.memory_db)
     mem.close()
+    click.echo(f"Initialized: {config.memory_db}")
 
     # Init beads
     try:
         from purser.beads import init_beads
 
         init_beads()
-        click.echo("Initialized beads.")
+        click.echo("Initialized: beads (issue tracking)")
     except FileNotFoundError:
         click.echo("Warning: bd CLI not found. Beads not initialized.", err=True)
-        click.echo("Install beads: brew install beads", err=True)
+        click.echo("  Install: brew install beads", err=True)
+        click.echo("  Or visit: https://github.com/gastowngang/beads", err=True)
     except Exception as e:
         click.echo(f"Warning: beads init failed: {e}", err=True)
 
-    click.echo(f"Purser initialized. Memory DB: {config.memory_db}")
+    # Check for recommended tools
+    _check_recommended_tools()
+
+    click.echo()
+    click.echo("Purser initialized successfully!")
+    click.echo(f"  Memory DB: {config.memory_db}")
+    click.echo()
+    click.echo("Next steps:")
+    click.echo('  purser spec add "Your feature description"')
+    click.echo("  purser work next  # See available work")
+
+
+def _is_initialized(config) -> bool:
+    """Check if purser appears to be initialized."""
+    return (
+        config.memory_db.parent.exists()
+        and config.specs_dir.exists()
+        and config.formulas_dir.exists()
+    )
+
+
+def _check_init_status(config) -> None:
+    """Report initialization status."""
+    import shutil
+
+    click.echo("Purser initialization status:")
+    click.echo(
+        f"  Memory DB directory: {'✓' if config.memory_db.parent.exists() else '✗'} {config.memory_db.parent}"
+    )
+    click.echo(f"  Memory DB file: {'✓' if config.memory_db.exists() else '✗'} {config.memory_db}")
+    click.echo(
+        f"  Specs directory: {'✓' if config.specs_dir.exists() else '✗'} {config.specs_dir}"
+    )
+    click.echo(
+        f"  Formulas directory: {'✓' if config.formulas_dir.exists() else '✗'} {config.formulas_dir}"
+    )
+    click.echo(
+        f"  Beads CLI: {'✓' if shutil.which('bd') else '✗'} {shutil.which('bd') or 'not found'}"
+    )
+
+
+def _check_recommended_tools() -> None:
+    """Check for recommended companion tools."""
+    import shutil
+
+    tools = [
+        ("ruff", "uv add --dev ruff"),
+        ("ty", "uv add --dev ty"),
+        ("bd", "brew install beads"),
+    ]
+
+    missing = []
+    for tool, install_cmd in tools:
+        if not shutil.which(tool):
+            missing.append((tool, install_cmd))
+
+    if missing:
+        click.echo()
+        click.echo("Optional tools not found (install for full functionality):")
+        for tool, install_cmd in missing:
+            click.echo(f"  {tool}: {install_cmd}")
 
 
 # --- spec ---
@@ -95,6 +183,78 @@ def spec_intake(ctx: click.Context, source: str, adapter: str | None) -> None:
 
     result = intake_spec(Path(source), adapter=llm, output_dir=config.specs_dir)
     _json_out(result, ctx.obj.get("json", False))
+
+
+@spec.command("add")
+@click.argument("description", required=False)
+@click.option("--file", "-f", type=click.Path(exists=True), help="Read description from file")
+@click.option("--adapter", default=None, help="LLM adapter to use for structuring")
+@click.option("--title", "-t", default=None, help="Override the generated title")
+@click.pass_context
+def spec_add(
+    ctx: click.Context,
+    description: str | None,
+    file: str | None,
+    adapter: str | None,
+    title: str | None,
+) -> None:
+    """Add a new spec from description text (uses PM agent to synthesize).
+
+    Examples:
+        purser spec add "Build a user authentication system with OAuth"
+        echo "Feature description" | purser spec add
+        purser spec add -f raw-notes.md
+    """
+    import sys
+    from pathlib import Path
+
+    from purser.adapters import get_adapter
+    from purser.config import load_config
+    from purser.spec import (
+        _parse_frontmatter,
+        _write_frontmatter,
+        intake_spec,
+    )
+
+    # Get description from file, argument, or stdin
+    if file:
+        text = Path(file).read_text()
+    elif description:
+        text = description
+    else:
+        text = sys.stdin.read()
+
+    if not text or not text.strip():
+        click.echo(
+            "Error: No description provided. Use argument, --file, or pipe to stdin.", err=True
+        )
+        ctx.exit(1)
+
+    config = load_config()
+    if adapter:
+        config.adapter.provider = adapter
+    llm = get_adapter(config.adapter)
+
+    click.echo("Synthesizing spec with PM agent...")
+    result = intake_spec(text, adapter=llm, output_dir=config.specs_dir)
+
+    # Override title if provided
+    if title:
+        result.title = title
+        # Update the file with new title
+        spec_path = config.specs_dir / f"{result.id.replace('spec-', '')}.md"
+        if spec_path.exists():
+            content = spec_path.read_text()
+            meta, body = _parse_frontmatter(content)
+            meta["title"] = title
+            spec_path.write_text(_write_frontmatter(meta, body))
+
+    if ctx.obj.get("json"):
+        _json_out(result, True)
+    else:
+        click.echo(f"Created spec: {result.id}")
+        click.echo(f"  Title: {result.title}")
+        click.echo(f"  Path: {config.specs_dir / f'{result.id.replace("spec-", "")}.md'}")
 
 
 @spec.command("list")
