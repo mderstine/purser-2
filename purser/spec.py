@@ -75,17 +75,17 @@ Respond with ONLY the markdown document, no preamble."""
 
 
 def intake_spec(
-    source: Path,
+    source: Path | str,
     *,
     adapter: LLMAdapter | None = None,
     output_dir: Path = Path("specs"),
 ) -> Spec:
-    """Ingest a raw spec file and produce structured markdown.
+    """Ingest a raw spec file or text and produce structured markdown.
 
     If an LLM adapter is provided, the raw text is processed through the LLM
     to produce a well-structured spec. Otherwise, the raw text is used as-is.
     """
-    raw_text = source.read_text()
+    raw_text = source.read_text() if isinstance(source, Path) else source
 
     if adapter:
         import asyncio
@@ -119,7 +119,7 @@ def intake_spec(
         "id": spec_id,
         "title": title,
         "created": now.strftime("%Y-%m-%d"),
-        "source": str(source),
+        "source": str(source) if isinstance(source, Path) else "inline",
     }
     content = _write_frontmatter(meta, structured)
 

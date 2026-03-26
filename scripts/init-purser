@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# /init-purser - Initialize purser with full diagnostics
+#
+# Usage: ./scripts/init-purser [--check] [--force]
+#
+# This script is a convenience wrapper around `purser init` that:
+# - Runs from the project root
+# - Shows initialization status
+# - Creates the AGENTS.md template if missing
+# - Provides helpful next steps
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+cd "$PROJECT_ROOT"
+
+# Find the purser command
+if command -v purser &>/dev/null; then
+    PURSER="purser"
+elif [ -f "uv.lock" ] && command -v uv &>/dev/null; then
+    PURSER="uv run purser"
+else
+    echo "Error: purser not found. Install it first:"
+    echo "  uv pip install -e ."
+    exit 1
+fi
+
+# Parse arguments
+CHECK_MODE=false
+FORCE_MODE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --check)
+            CHECK_MODE=true
+            shift
+            ;;
+        --force)
+            FORCE_MODE=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: init-purser [--check] [--force]"
+            echo ""
+            echo "Options:"
+            echo "  --check   Show initialization status only"
+            echo "  --force   Force re-initialization"
+            echo "  -h, --help  Show this help"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage"
+            exit 1
+            ;;
+    esac
+done
+
+# Banner
+echo "╔══════════════════════════════════════════════════════════╗"
+echo "║           Purser Project Initialization                  ║"
+echo "╚══════════════════════════════════════════════════════════╝"
+echo ""
+
+# Run init with appropriate flags
+INIT_FLAGS=""
+if [ "$CHECK_MODE" = true ]; then
+    INIT_FLAGS="--check"
+elif [ "$FORCE_MODE" = true ]; then
+    INIT_FLAGS="--force"
+fi
+
+$PURSER init $INIT_FLAGS
+
+# Skip remaining setup if in check mode
+if [ "$CHECK_MODE" = true ]; then
+    exit 0
+fi
+
+# Check if AGENTS.md exists, create template if not
+if [ ! -f "AGENTS.md" ]; then
+    echo ""
+    echo "Creating AGENTS.md template..."
+    cat > AGENTS.md << 'EOF'
+# Agent Instructions
+
+This project uses **purser** for project management.
+
+## Quick Reference
+
+```bash
+./scripts/init-purser --check   # Check status
+purser spec add "Description"   # Add a new spec
+purser work next                # Find ready work
+purser work claim <id>          # Claim a task
+purser work done <id>           # Mark complete
+```
+
+## Workflow
+
+1. PM Agent creates specs via `purser spec add`
+2. PM Agent decomposes specs into plans
+3. Worker Agents claim and execute tasks
+4. All agents use `purser lint` before closing work
+
+## Beads Issue Tracker
+
+This project uses `bd` (beads) for issue tracking.
+
+```bash
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --claim  # Claim work
+bd close <id>         # Complete work
+bd dolt push          # Push to remote
+```
+EOF
+    echo "Created: AGENTS.md"
+fi
+
+echo ""
+echo "✓ Purser initialization complete!"
