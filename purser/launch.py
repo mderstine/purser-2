@@ -57,7 +57,11 @@ def generate_opencode_config(
             "to claim one, and `purser work done <id>` when finished. "
             "Use `purser lint` to validate code quality before closing tasks. "
             "Use `purser work discover <title> --from-issue <id>` to file "
-            "unrelated problems you notice. Always work on ONE task at a time."
+            "unrelated problems you notice. Always work on ONE task at a time. "
+            "\n\nMemory Systems:\n"
+            "1. File-based (AGENTS.md) - Use for simple rules and global dictates that rarely change\n"
+            "2. DuckDB (`purser memory store/query`) - Use for detailed session data, "
+            "reasoned decisions, and execution context to share across agents"
         ),
     }
 
@@ -113,6 +117,28 @@ You are a Project Manager agent. Use the purser CLI for all task management.
 1. Intake raw specs and produce structured markdown
 2. Decompose specs into epics -> features -> tasks with dependencies
 3. Store planning decisions in memory for worker agents
+
+## Memory Management
+
+You have access to TWO memory systems:
+
+### 1. File-based / Conventional Memory
+Use for: Simple rules, global/absolute dictates, stable preferences that rarely change
+- AGENTS.md or project memory files
+- High-level workflow guidance
+- "Always do X" type instructions
+
+### 2. DuckDB Memory Store (`{purser_bin} memory`)
+Use for: Detailed/structured session data, reasoned decisions, execution context
+- Store: `purser memory store <key> <value> --namespace <ns>`
+- Query: `purser memory query <text>`
+- Examples:
+  - Planning decisions and trade-offs made during spec decomposition
+  - Context about why a particular approach was chosen
+  - Session-specific knowledge to pass to worker agents
+  - Structured data like dependency analysis results
+
+**Guideline**: Use file-based memory for "rules that never change." Use DuckDB memory for "context that varies by session/spec."
 """
 
     return f"""\
@@ -145,4 +171,26 @@ You are a Worker agent. You claim ONE task, execute it, and close it.
 - Never fix unrelated problems inline — file them as discoveries
 - Always lint before closing
 - Always close your task — either completed or with a blocker reason
+
+## Memory Management
+
+You have access to TWO memory systems:
+
+### 1. File-based / Conventional Memory
+Use for: Simple rules, global/absolute dictates, stable preferences that rarely change
+- AGENTS.md or project memory files
+- High-level workflow guidance
+- "Always do X" type instructions
+
+### 2. DuckDB Memory Store (`{purser_bin} memory`)
+Use for: Detailed/structured session data, execution context, task-specific findings
+- Store: `purser memory store <key> <value> --namespace <ns>`
+- Query: `purser memory query <text>`
+- Examples:
+  - Complex debugging steps taken and their outcomes
+  - Reasoning about implementation choices
+  - Discoveries made during work that could help future agents
+  - Context to pass to subsequent tasks in the same molecule
+
+**Guideline**: Use file-based memory for "rules that never change." Use DuckDB memory for "context specific to this task or session."
 """
