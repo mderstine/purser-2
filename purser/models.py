@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from datetime import datetime  # noqa: TC003
+from typing import Any, Literal
 
-if TYPE_CHECKING:
-    from datetime import datetime
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # --- Beads entities ---
 
@@ -129,3 +127,52 @@ class AdapterConfig(BaseModel):
     base_url: str | None = None
     temperature: float = 0.0
     max_tokens: int = 4096
+
+
+# --- GitHub integration ---
+
+
+def _validate_repo_format(v: str) -> str:
+    """Validate owner/repo format."""
+    if "/" not in v or v.count("/") != 1:
+        raise ValueError(f"repo must be in 'owner/repo' format, got: {v!r}")
+    owner, repo = v.split("/")
+    if not owner or not repo:
+        raise ValueError(f"repo must be in 'owner/repo' format, got: {v!r}")
+    return v
+
+
+class GitHubRepoConfig(BaseModel):
+    """Configuration for a single GitHub repository in multi-repo setups."""
+
+    name: str  # owner/repo format
+    labels: list[str] = Field(default_factory=list)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        return _validate_repo_format(v)
+
+
+class GitHubConfig(BaseModel):
+    """Optional GitHub integration configuration.
+
+    When enabled, purser syncs beads bidirectionally with GitHub Issues
+    and GitHub Projects via the gh CLI.
+    """
+
+    enabled: bool = False
+    repo: str | None = None  # owner/repo format
+    project: str | None = None  # GH Project name or number
+    sync_on_commit: bool = False
+    conflict_strategy: Literal["local-wins", "remote-wins", "prompt"] = "local-wins"
+    label_prefix: str = ""
+    username_map: dict[str, str] = Field(default_factory=dict)
+    repos: list[GitHubRepoConfig] = Field(default_factory=list)
+
+    @field_validator("repo")
+    @classmethod
+    def validate_repo(cls, v: str | None) -> str | None:
+        if v is not None:
+            _validate_repo_format(v)
+        return v

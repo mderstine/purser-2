@@ -113,7 +113,22 @@ class OpenAICompatAdapter(LLMAdapter):
         provider = config.provider.lower()
         self.base_url = config.base_url or _DEFAULT_URLS.get(provider, _DEFAULT_URLS["openai"])
         env_var = _API_KEY_ENV.get(provider, "OPENAI_API_KEY")
-        self.api_key = config.api_key or os.environ.get(env_var, "")
+        self.api_key = config.api_key or os.environ.get(env_var)
+
+        if not self.api_key:
+            raise ValueError(
+                f"API key required for provider '{provider}'. "
+                f"Set it in purser.toml [adapter] section as 'api_key', "
+                f"or set environment variable {env_var}, "
+                f"or PURSER_API_KEY."
+            )
+
+        # Apply provider-specific default model if current model doesn't match provider
+        default_model = _DEFAULT_MODELS.get(provider)
+        if default_model and (
+            not config.model or (config.model == "gpt-4o" and provider != "openai")
+        ):
+            self.config.model = default_model
 
         # Apply provider-specific default model if current model doesn't match provider
         default_model = _DEFAULT_MODELS.get(provider)

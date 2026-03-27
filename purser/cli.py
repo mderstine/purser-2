@@ -233,7 +233,12 @@ def spec_add(
     config = load_config()
     if adapter:
         config.adapter.provider = adapter
-    llm = get_adapter(config.adapter)
+
+    try:
+        llm = get_adapter(config.adapter)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
 
     click.echo("Synthesizing spec with PM agent...")
     result = intake_spec(text, adapter=llm, output_dir=config.specs_dir)
@@ -659,6 +664,12 @@ def agent_run(
     finally:
         mem.close()
 
+
+# --- gh (GitHub integration) ---
+
+from purser.gh.commands import gh_group  # noqa: E402
+
+cli.add_command(gh_group)
 
 if __name__ == "__main__":
     cli()

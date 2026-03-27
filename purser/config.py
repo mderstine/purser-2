@@ -8,11 +8,12 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from purser.models import AdapterConfig
+from purser.models import AdapterConfig, GitHubConfig
 
 
 class PurserConfig(BaseModel):
     adapter: AdapterConfig = AdapterConfig()
+    github: GitHubConfig = GitHubConfig()
     specs_dir: Path = Path("specs")
     formulas_dir: Path = Path("formulas")
     memory_db: Path = Path(".purser/memory.duckdb")
@@ -52,5 +53,18 @@ def load_config(project_dir: Path | None = None) -> PurserConfig:
             adapter_data[field] = val
 
     config_data["adapter"] = adapter_data
+
+    # Build github config from file + env
+    gh_data = config_data.get("github", {})
+    gh_env_map = {
+        "PURSER_GH_ENABLED": ("enabled", lambda v: v.lower() in ("1", "true", "yes")),
+        "PURSER_GH_REPO": ("repo", str),
+        "PURSER_GH_PROJECT": ("project", str),
+    }
+    for env_key, (field, converter) in gh_env_map.items():
+        val = os.environ.get(env_key)
+        if val:
+            gh_data[field] = converter(val)
+    config_data["github"] = gh_data
 
     return PurserConfig.model_validate(config_data)
