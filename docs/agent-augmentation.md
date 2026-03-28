@@ -7,6 +7,7 @@ interaction, and applying changes. Purser adds:
 - decomposition via `purser plan ...`
 - queueing and state via `bd`
 - memory via `purser memory ...`
+- quality checks via `purser lint`
 
 ## Work Record vs Memory
 
@@ -19,7 +20,24 @@ Practical rule:
 
 - If it changes the task graph or project state, put it in Beads.
 - If it captures reusable understanding, put it in DuckDB memory.
-- quality checks via `purser lint`
+
+## GitHub Sync
+
+When Purser GitHub integration is enabled, agents are expected to keep GitHub in sync
+with the Beads work graph.
+
+Use:
+
+- `purser gh status` to inspect configuration and current sync state
+- `purser gh sync` for normal bidirectional synchronization
+- `purser gh push` when local Beads changes are authoritative and should be published
+- `purser gh pull` when remote GitHub changes should be imported locally
+
+Operational rule:
+
+- Check GitHub sync state at session start.
+- Sync before a larger autonomous batch if local and remote may have diverged.
+- Sync again after changing work state so GitHub Issues and Project items stay current.
 
 ## Ralph Loop
 
@@ -33,6 +51,7 @@ In Purser terms, a Ralph loop means:
 6. Repeat until no safe ready beads remain
 
 Memory is not a mandatory loop step. Store memory only when it would materially help a later bead or later session.
+When GitHub integration is enabled, sync is part of the loop boundary even though it does not replace Beads as the source of truth.
 
 ## VS Code
 
@@ -68,6 +87,8 @@ While looping:
 
 - Keep work state in `bd`
 - Store DuckDB memory only for non-obvious decisions, learnings, blockers, failed attempts, or context that should survive a narrower future session
+- Check `purser gh status` at the start of a session when GitHub integration is enabled
+- Run `purser gh sync` before and after a larger autonomous batch so GitHub stays aligned with Beads
 
 ## Codex CLI
 
@@ -85,6 +106,7 @@ workflow from `AGENTS.md` and terminal commands:
 The loop is procedural rather than hook-driven, but the behavior is the same.
 
 Apply the same memory rule: Beads for work state, DuckDB for reusable context.
+Apply the same GitHub rule: if the repo is configured for GitHub sync, use `purser gh ...` as part of the normal session workflow.
 
 ## Claude Code
 

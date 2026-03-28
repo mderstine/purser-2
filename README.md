@@ -19,6 +19,7 @@ binding the framework to one model vendor or one editor.
 - `bd ...`: queue, claim, and close work
 - `purser memory ...`: persist reusable decisions, learnings, and session context between sessions
 - `purser lint`: run code-quality checks
+- `purser gh ...`: sync Beads with GitHub Issues and Projects when GitHub integration is enabled
 
 ## Ralph Loop
 
@@ -37,6 +38,25 @@ Work-state policy:
 
 - Beads is the authoritative record of work, decomposition, dependencies, and completion state.
 - DuckDB memory is for reusable decisions, learnings, failed attempts, and context that future agents should recover without rereading large histories.
+- GitHub, when configured, is a synchronized remote representation of the Beads work graph and project state.
+
+## GitHub Integration
+
+Purser has an optional GitHub integration layer for repos and Projects. When enabled,
+agents are expected to use it as part of normal workflow rather than treating it as a
+manual afterthought.
+
+Typical agent workflow when GitHub integration is enabled:
+
+1. Run `purser gh status` at session start
+2. Run `purser gh sync` before starting a larger batch if local and remote may have diverged
+3. Perform the normal Beads Ralph loop
+4. Run `purser gh sync` again after changing work state so GitHub Issues and Project items stay current
+
+If you only need one direction:
+
+- `purser gh push` to publish local Beads changes
+- `purser gh pull` to import remote GitHub changes
 
 ## VS Code
 
@@ -72,6 +92,8 @@ Then enable:
 ```
 
 After that, run `/purser-build-all` in VS Code chat or a background agent session.
+If GitHub integration is enabled for the repo, the agent should also check `purser gh status`
+and sync before and after a larger work batch.
 
 ## Codex CLI
 
@@ -90,13 +112,14 @@ bd close <id> --reason "..."
 Repeat until the ready queue is exhausted.
 
 Use `purser memory` only when a decision or finding is worth carrying across sessions or smaller context windows. Routine work progress should remain in Beads, commits, and the codebase.
+If GitHub integration is enabled, Codex should also run `purser gh status` at session start and `purser gh sync` after meaningful work-state changes.
 
 ## Claude Code
 
 Claude Code uses the same Purser and Beads commands. `AGENTS.md` remains the shared
 workspace instruction source, and you can mirror the VS Code personas into
 `.claude/agents` if you want tool-specific ergonomics. The workflow itself does not
-change.
+change. If GitHub integration is enabled, Claude Code should follow the same sync policy.
 
 ## Tool-Specific Instructions
 

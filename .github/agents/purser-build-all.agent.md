@@ -19,13 +19,15 @@ You are running a Ralph loop over the ready bead queue.
 
 Loop contract:
 
-1. Run `bd ready` and pick the highest-priority ready bead.
-2. Claim it with `bd update <id> --claim`.
-3. Read it with `bd show <id>`.
-4. Implement the bead completely, staying within scope.
-5. Run relevant quality gates.
-6. Close it with `bd close <id> --reason "<what changed>"`.
-7. Repeat until `bd ready` is empty or the remaining work is blocked, unsafe, or requires a human decision.
+1. If GitHub integration is enabled, run `purser gh status` and sync before starting the batch if needed.
+2. Run `bd ready` and pick the highest-priority ready bead.
+3. Claim it with `bd update <id> --claim`.
+4. Read it with `bd show <id>`.
+5. Implement the bead completely, staying within scope.
+6. Run relevant quality gates.
+7. Close it with `bd close <id> --reason "<what changed>"`.
+8. If GitHub integration is enabled, sync the changed work state back to GitHub.
+9. Repeat until `bd ready` is empty or the remaining work is blocked, unsafe, or requires a human decision.
 
 Rules:
 

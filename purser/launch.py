@@ -67,6 +67,8 @@ def generate_opencode_config(
             "Use `purser work next` to find ready tasks, `purser work claim <id>` "
             "to claim one, and `purser work done <id>` when finished. "
             "Use `purser lint` to validate code quality before closing tasks. "
+            "If GitHub integration is enabled, use `purser gh status` and "
+            "`purser gh sync` to keep GitHub Issues and Projects aligned with Beads. "
             "Use `purser work discover <title> --from-issue <id>` to file "
             "unrelated problems you notice. Always work on ONE task at a time. "
             "\n\nMemory Systems:\n"
@@ -155,6 +157,7 @@ You are a Project Manager agent. Use the purser CLI for all task management.
 - `{purser_bin} spec show <id>` — Show a spec
 - `{purser_bin} plan create <spec_id>` — Decompose spec into epics/features/tasks
 - `{purser_bin} plan show <id>` — Show plan dependency tree
+- `{purser_bin} gh status|sync|push|pull` — Keep GitHub Issues/Projects aligned when GitHub integration is enabled
 - `{purser_bin} --json <command>` — Get JSON output for any command
 - `{purser_bin} memory store <key> <value>` — Save context for later
 - `{purser_bin} memory query <text>` — Recall saved context
@@ -164,7 +167,8 @@ You are a Project Manager agent. Use the purser CLI for all task management.
 ## Workflow
 1. Intake raw specs and produce structured markdown
 2. Decompose specs into epics -> features -> tasks with dependencies
-3. Store planning decisions in memory for worker agents
+3. If GitHub integration is enabled, sync planning changes to GitHub
+4. Store planning decisions in memory for worker agents
 
 ## Memory Management
 
@@ -202,6 +206,7 @@ You are a Worker agent. You claim ONE task, execute it, and close it.
 - `{purser_bin} work claim <id>` — Claim a task
 - `{purser_bin} work done <id> --reason "..."` — Close a completed task
 - `{purser_bin} work discover <title> --from-issue <id>` — File unrelated problems
+- `{purser_bin} gh status|sync|push|pull` — Keep GitHub Issues/Projects aligned when GitHub integration is enabled
 - `{purser_bin} --json <command>` — Get JSON output for any command
 - `{purser_bin} memory store <key> <value>` — Save execution context
 - `{purser_bin} memory query <text>` — Recall context from PM or prior workers
@@ -210,12 +215,14 @@ You are a Worker agent. You claim ONE task, execute it, and close it.
 - `{purser_bin} sync` — Persist all state
 
 ## Workflow
-1. Run `{purser_bin} work next` to find available work
-2. Run `{purser_bin} work claim <id>` to take ownership
-3. Implement the task
-4. Run `{purser_bin} lint` to validate code quality
-5. If you notice unrelated problems: `{purser_bin} work discover <title> --from-issue <id>`
-6. Run `{purser_bin} work done <id> --reason "what was done"`
+1. If GitHub integration is enabled, run `{purser_bin} gh status` at session start
+2. Run `{purser_bin} work next` to find available work
+3. Run `{purser_bin} work claim <id>` to take ownership
+4. Implement the task
+5. Run `{purser_bin} lint` to validate code quality
+6. Run `{purser_bin} gh sync` after meaningful work-state changes when GitHub integration is enabled
+7. If you notice unrelated problems: `{purser_bin} work discover <title> --from-issue <id>`
+8. Run `{purser_bin} work done <id> --reason "what was done"`
 
 ## Rules
 - Work on exactly ONE task per session
@@ -295,12 +302,14 @@ Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](..
 Operate as a single-bead worker:
 
 1. Run `bd prime` when you need current workflow context.
-2. Accept a specific bead ID if one is provided; otherwise run `bd ready`.
-3. Claim exactly one bead with `bd update <id> --claim`.
-4. Read the issue details with `bd show <id>`.
-5. Implement only the scoped work for that bead.
-6. Run quality gates before closing the bead.
-7. Close the bead with `bd close <id> --reason "<what changed>"`.
+2. If GitHub integration is enabled, run `purser gh status` and sync as needed before starting.
+3. Accept a specific bead ID if one is provided; otherwise run `bd ready`.
+4. Claim exactly one bead with `bd update <id> --claim`.
+5. Read the issue details with `bd show <id>`.
+6. Implement only the scoped work for that bead.
+7. Run quality gates before closing the bead.
+8. Close the bead with `bd close <id> --reason "<what changed>"`.
+9. If GitHub integration is enabled, sync the changed work state back to GitHub.
 
 Do not create ad hoc TODO files. Use `bd` for task tracking. Do not stop with unpushed work.
 Use `bd` as the work record. Use `purser memory store/query` only for reusable decisions, learnings, failed approaches, or context that should help later agents.
@@ -330,13 +339,15 @@ You are running a Ralph loop over the ready bead queue.
 
 Loop contract:
 
-1. Run `bd ready` and pick the highest-priority ready bead.
-2. Claim it with `bd update <id> --claim`.
-3. Read it with `bd show <id>`.
-4. Implement the bead completely, staying within scope.
-5. Run relevant quality gates.
-6. Close it with `bd close <id> --reason "<what changed>"`.
-7. Repeat until `bd ready` is empty or the remaining work is blocked, unsafe, or requires a human decision.
+1. If GitHub integration is enabled, run `purser gh status` and sync before starting the batch if needed.
+2. Run `bd ready` and pick the highest-priority ready bead.
+3. Claim it with `bd update <id> --claim`.
+4. Read it with `bd show <id>`.
+5. Implement the bead completely, staying within scope.
+6. Run relevant quality gates.
+7. Close it with `bd close <id> --reason "<what changed>"`.
+8. If GitHub integration is enabled, sync the changed work state back to GitHub.
+9. Repeat until `bd ready` is empty or the remaining work is blocked, unsafe, or requires a human decision.
 
 Rules:
 
@@ -364,6 +375,7 @@ Before you start, load [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-
 Execution policy:
 
 - Work only from the Beads queue.
+- If GitHub integration is enabled, check `purser gh status` at the start and sync before and after the batch as needed.
 - Repeatedly run `bd ready`, claim one bead, complete it, lint/test, close it, and move to the next ready bead.
 - Keep going until no safe ready beads remain.
 - Use `bd` as the authoritative work record; use `purser memory` only for reusable context and learnings worth carrying across sessions.

@@ -12,6 +12,7 @@ Before you start, load [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-
 Execution policy:
 
 - Work only from the Beads queue.
+- If GitHub integration is enabled, check `purser gh status` at the start and sync before and after the batch as needed.
 - Repeatedly run `bd ready`, claim one bead, complete it, lint/test, close it, and move to the next ready bead.
 - Keep going until no safe ready beads remain.
 - Use `bd` as the authoritative work record; use `purser memory` only for reusable context and learnings worth carrying across sessions.
