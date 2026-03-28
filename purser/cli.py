@@ -553,8 +553,47 @@ def launch_opencode(
         click.echo("     OR: opencode  (if installed directly)")
 
 
+@launch.command("vscode")
+@click.option(
+    "--output-dir",
+    default=".",
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Workspace directory to scaffold (default: current directory)",
+)
+@click.option("--force", is_flag=True, help="Overwrite existing scaffolded files")
+@click.pass_context
+def launch_vscode(ctx: click.Context, output_dir: Path, force: bool) -> None:
+    """Scaffold VS Code prompt, agent, hook, and docs files for Purser."""
+    from purser.launch import generate_vscode_workspace
+
+    written = generate_vscode_workspace(workspace_root=output_dir, force=force)
+
+    if ctx.obj.get("json"):
+        _json_out({"written": [str(path) for path in written]}, True)
+        return
+
+    if written:
+        click.echo(f"Scaffolded {len(written)} VS Code Purser file(s):")
+        for path in written:
+            click.echo(f"  {path}")
+    else:
+        click.echo("No files written. Use --force to overwrite existing scaffolding.")
+
+    click.echo()
+    click.echo("Next steps:")
+    click.echo("  1. Enable VS Code settings: chat.useAgentsMdFile and chat.useCustomAgentHooks")
+    click.echo("  2. Open Chat/Agent mode in VS Code")
+    click.echo("  3. Run /purser-build-all to start the Ralph loop")
+
+
 @launch.command("instructions")
 @click.argument("role", type=click.Choice(["pm", "worker"]))
+@click.option(
+    "--tool",
+    default="generic",
+    type=click.Choice(["generic", "vscode", "codex", "claude"]),
+    help="Host tool these instructions are for",
+)
 @click.option(
     "--output",
     "output_path",
@@ -562,7 +601,7 @@ def launch_opencode(
     type=click.Path(),
     help="Write to file instead of stdout",
 )
-def launch_instructions(role: str, output_path: str | None) -> None:
+def launch_instructions(role: str, tool: str, output_path: str | None) -> None:
     """Print agent instructions for any external tool.
 
     These instructions can be pasted into any agent's system prompt,
@@ -570,7 +609,7 @@ def launch_instructions(role: str, output_path: str | None) -> None:
     """
     from purser.launch import generate_agent_instructions
 
-    instructions = generate_agent_instructions(role)
+    instructions = generate_agent_instructions(role, tool=tool)
     if output_path:
         from pathlib import Path
 
