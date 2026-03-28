@@ -33,3 +33,4 @@ Rules:
 - If you discover unrelated work, file a new bead instead of expanding scope.
 - Summarize completed, blocked, and newly discovered work before finishing.
 - Do not stop early just because one bead completed; continue until the queue is exhausted or there is a clear blocker.
+- Keep work state in `bd`. Store DuckDB memory only for reusable decisions, learnings, failed approaches, or context that should help future narrower sessions.

@@ -17,7 +17,7 @@ binding the framework to one model vendor or one editor.
 - `purser spec ...`: intake and manage specs
 - `purser plan ...`: decompose specs into epics, features, and tasks
 - `bd ...`: queue, claim, and close work
-- `purser memory ...`: persist context between sessions
+- `purser memory ...`: persist reusable decisions, learnings, and session context between sessions
 - `purser lint`: run code-quality checks
 
 ## Ralph Loop
@@ -32,6 +32,11 @@ Purser supports a repeatable execution loop for draining open work:
 6. Continue until no safe ready beads remain
 
 This repo refers to that pattern as the Ralph loop.
+
+Work-state policy:
+
+- Beads is the authoritative record of work, decomposition, dependencies, and completion state.
+- DuckDB memory is for reusable decisions, learnings, failed attempts, and context that future agents should recover without rereading large histories.
 
 ## VS Code
 
@@ -83,6 +88,8 @@ bd close <id> --reason "..."
 ```
 
 Repeat until the ready queue is exhausted.
+
+Use `purser memory` only when a decision or finding is worth carrying across sessions or smaller context windows. Routine work progress should remain in Beads, commits, and the codebase.
 
 ## Claude Code
 

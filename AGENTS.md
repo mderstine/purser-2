@@ -54,7 +54,10 @@ bd close <id>         # Complete work
 
 - Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
 - Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+- Use `bd` as the authoritative work record and decomposition system
+- Use `bd remember` for durable repo-level knowledge that should live with the work tracker
+- Use `purser memory store/query` for reusable decisions, learnings, failed approaches, and session context that help future agents operate with smaller context windows
+- Do NOT use MEMORY.md files
 
 ## Session Completion
 

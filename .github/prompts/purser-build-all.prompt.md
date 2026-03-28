@@ -14,6 +14,7 @@ Execution policy:
 - Work only from the Beads queue.
 - Repeatedly run `bd ready`, claim one bead, complete it, lint/test, close it, and move to the next ready bead.
 - Keep going until no safe ready beads remain.
+- Use `bd` as the authoritative work record; use `purser memory` only for reusable context and learnings worth carrying across sessions.
 - If you stop because the queue is blocked, explain exactly which bead blocked progress and what follow-up is needed.
 - End with a compact report of:
   - completed beads

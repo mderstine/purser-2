@@ -19,3 +19,4 @@ Operate as a single-bead worker:
 7. Close the bead with `bd close <id> --reason "<what changed>"`.
 
 Do not create ad hoc TODO files. Use `bd` for task tracking. Do not stop with unpushed work.
+Use `bd` as the work record. Use `purser memory store/query` only for reusable decisions, learnings, failed approaches, or context that should help later agents.

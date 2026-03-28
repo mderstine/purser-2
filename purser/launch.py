@@ -70,9 +70,10 @@ def generate_opencode_config(
             "Use `purser work discover <title> --from-issue <id>` to file "
             "unrelated problems you notice. Always work on ONE task at a time. "
             "\n\nMemory Systems:\n"
-            "1. File-based (AGENTS.md) - Use for simple rules and global dictates that rarely change\n"
-            "2. DuckDB (`purser memory store/query`) - Use for detailed session data, "
-            "reasoned decisions, and execution context to share across agents"
+            "1. Beads (`bd`) - Use as the authoritative work record for decomposition, "
+            "status, dependencies, and discoveries\n"
+            "2. DuckDB (`purser memory store/query`) - Use for reusable decisions, "
+            "learnings, failed approaches, and execution context to share across agents"
         ),
     }
 
@@ -167,25 +168,26 @@ You are a Project Manager agent. Use the purser CLI for all task management.
 
 ## Memory Management
 
-You have access to TWO memory systems:
+You have access to TWO persistence systems:
 
-### 1. File-based / Conventional Memory
-Use for: Simple rules, global/absolute dictates, stable preferences that rarely change
-- AGENTS.md or project memory files
-- High-level workflow guidance
-- "Always do X" type instructions
+### 1. Beads (`bd`)
+Use for: the authoritative work record
+- Spec decomposition into epics, features, and tasks
+- Dependencies, discoveries, and blockers
+- Current state of what is open, in progress, or closed
+- Anything that changes the project work graph
 
 ### 2. DuckDB Memory Store (`{purser_bin} memory`)
-Use for: Detailed/structured session data, reasoned decisions, execution context
+Use for: reusable context that helps future agents work with smaller context windows
 - Store: `purser memory store <key> <value> --namespace <ns>`
 - Query: `purser memory query <text>`
 - Examples:
   - Planning decisions and trade-offs made during spec decomposition
   - Context about why a particular approach was chosen
   - Session-specific knowledge to pass to worker agents
-  - Structured data like dependency analysis results
+  - Failed approaches or debugging learnings worth reusing
 
-**Guideline**: Use file-based memory for "rules that never change." Use DuckDB memory for "context that varies by session/spec."
+**Guideline**: If it changes work state, put it in Beads. If it captures reusable understanding, put it in DuckDB memory.
 """
 
     return f"""\
@@ -223,16 +225,16 @@ You are a Worker agent. You claim ONE task, execute it, and close it.
 
 ## Memory Management
 
-You have access to TWO memory systems:
+You have access to TWO persistence systems:
 
-### 1. File-based / Conventional Memory
-Use for: Simple rules, global/absolute dictates, stable preferences that rarely change
-- AGENTS.md or project memory files
-- High-level workflow guidance
-- "Always do X" type instructions
+### 1. Beads (`bd`)
+Use for: the authoritative work record
+- Task status, scope, dependencies, blockers, and discoveries
+- Notes about the work item itself
+- Anything that changes the queue or task graph
 
 ### 2. DuckDB Memory Store (`{purser_bin} memory`)
-Use for: Detailed/structured session data, execution context, task-specific findings
+Use for: reusable context that should survive this session
 - Store: `purser memory store <key> <value> --namespace <ns>`
 - Query: `purser memory query <text>`
 - Examples:
@@ -241,7 +243,7 @@ Use for: Detailed/structured session data, execution context, task-specific find
   - Discoveries made during work that could help future agents
   - Context to pass to subsequent tasks in the same molecule
 
-**Guideline**: Use file-based memory for "rules that never change." Use DuckDB memory for "context specific to this task or session."
+**Guideline**: Keep routine work state in Beads. Store DuckDB memory only when it will help later agents avoid re-deriving important context.
 """
 
 
@@ -301,6 +303,7 @@ Operate as a single-bead worker:
 7. Close the bead with `bd close <id> --reason "<what changed>"`.
 
 Do not create ad hoc TODO files. Use `bd` for task tracking. Do not stop with unpushed work.
+Use `bd` as the work record. Use `purser memory store/query` only for reusable decisions, learnings, failed approaches, or context that should help later agents.
 """
 
 
@@ -341,6 +344,7 @@ Rules:
 - If you discover unrelated work, file a new bead instead of expanding scope.
 - Summarize completed, blocked, and newly discovered work before finishing.
 - Do not stop early just because one bead completed; continue until the queue is exhausted or there is a clear blocker.
+- Keep work state in `bd`. Store DuckDB memory only for reusable decisions, learnings, failed approaches, or context that should help future narrower sessions.
 """
 
 
@@ -362,6 +366,7 @@ Execution policy:
 - Work only from the Beads queue.
 - Repeatedly run `bd ready`, claim one bead, complete it, lint/test, close it, and move to the next ready bead.
 - Keep going until no safe ready beads remain.
+- Use `bd` as the authoritative work record; use `purser memory` only for reusable context and learnings worth carrying across sessions.
 - If you stop because the queue is blocked, explain exactly which bead blocked progress and what follow-up is needed.
 - End with a compact report of:
   - completed beads
@@ -502,6 +507,18 @@ interaction, and applying changes. Purser adds:
 - decomposition via `purser plan ...`
 - queueing and state via `bd`
 - memory via `purser memory ...`
+
+## Work Record vs Memory
+
+Purser uses two different persistence layers for different jobs:
+
+- Beads is the authoritative work record. Use it for decomposition, dependencies, status, discoveries, and completion.
+- DuckDB memory is the reusable context layer. Use `purser memory store/query` for decisions, learnings, failed approaches, debugging context, and other information that should help future agents work with smaller context windows.
+
+Practical rule:
+
+- If it changes the task graph or project state, put it in Beads.
+- If it captures reusable understanding, put it in DuckDB memory.
 - quality checks via `purser lint`
 
 ## Ralph Loop
@@ -514,6 +531,8 @@ In Purser terms, a Ralph loop means:
 4. Run quality gates
 5. Close the bead with `bd close <id> --reason "..."`
 6. Repeat until no safe ready beads remain
+
+Memory is not a mandatory loop step. Store memory only when it would materially help a later bead or later session.
 
 ## VS Code
 
@@ -545,6 +564,11 @@ Recommended settings to enable the full workflow:
 Use `/purser-build-all` from chat or a background agent session when you want the
 agent to keep draining the ready queue.
 
+While looping:
+
+- Keep work state in `bd`
+- Store DuckDB memory only for non-obvious decisions, learnings, blockers, failed attempts, or context that should survive a narrower future session
+
 ## Codex CLI
 
 Codex does not use VS Code prompt files or hooks, but it can follow the exact same
@@ -559,6 +583,8 @@ workflow from `AGENTS.md` and terminal commands:
 7. Continue with the next ready bead
 
 The loop is procedural rather than hook-driven, but the behavior is the same.
+
+Apply the same memory rule: Beads for work state, DuckDB for reusable context.
 
 ## Claude Code
 

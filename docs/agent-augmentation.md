@@ -7,6 +7,18 @@ interaction, and applying changes. Purser adds:
 - decomposition via `purser plan ...`
 - queueing and state via `bd`
 - memory via `purser memory ...`
+
+## Work Record vs Memory
+
+Purser uses two different persistence layers for different jobs:
+
+- Beads is the authoritative work record. Use it for decomposition, dependencies, status, discoveries, and completion.
+- DuckDB memory is the reusable context layer. Use `purser memory store/query` for decisions, learnings, failed approaches, debugging context, and other information that should help future agents work with smaller context windows.
+
+Practical rule:
+
+- If it changes the task graph or project state, put it in Beads.
+- If it captures reusable understanding, put it in DuckDB memory.
 - quality checks via `purser lint`
 
 ## Ralph Loop
@@ -19,6 +31,8 @@ In Purser terms, a Ralph loop means:
 4. Run quality gates
 5. Close the bead with `bd close <id> --reason "..."`
 6. Repeat until no safe ready beads remain
+
+Memory is not a mandatory loop step. Store memory only when it would materially help a later bead or later session.
 
 ## VS Code
 
@@ -50,6 +64,11 @@ Recommended settings to enable the full workflow:
 Use `/purser-build-all` from chat or a background agent session when you want the
 agent to keep draining the ready queue.
 
+While looping:
+
+- Keep work state in `bd`
+- Store DuckDB memory only for non-obvious decisions, learnings, blockers, failed attempts, or context that should survive a narrower future session
+
 ## Codex CLI
 
 Codex does not use VS Code prompt files or hooks, but it can follow the exact same
@@ -64,6 +83,8 @@ workflow from `AGENTS.md` and terminal commands:
 7. Continue with the next ready bead
 
 The loop is procedural rather than hook-driven, but the behavior is the same.
+
+Apply the same memory rule: Beads for work state, DuckDB for reusable context.
 
 ## Claude Code
 
