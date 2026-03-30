@@ -21,6 +21,37 @@ binding the framework to one model vendor or one editor.
 - `purser lint`: run code-quality checks
 - `purser gh ...`: sync Beads with GitHub Issues and Projects when GitHub integration is enabled
 
+## Setup
+
+Initialize a repository locally:
+
+```bash
+uv run purser init
+uv run purser init --check
+```
+
+That local setup creates and verifies:
+
+- `specs/`
+- `formulas/`
+- `.purser/memory.duckdb`
+- local Beads state via `bd init`
+
+If you also want GitHub coordination, either configure it during init:
+
+```bash
+uv run purser init --with-github --repo owner/repo --project "Roadmap"
+```
+
+or attach it afterward:
+
+```bash
+uv run purser gh attach --repo owner/repo --project "Roadmap"
+uv run purser gh sync
+```
+
+`purser gh attach` writes configuration only. `purser gh sync` is the first actual synchronization step.
+
 ## Ralph Loop
 
 Purser supports a repeatable execution loop for draining open work:

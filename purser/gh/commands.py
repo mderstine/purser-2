@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from purser.gh.cli import check_gh_availability, get_gh_version
+from purser.models import GitHubConfig
 
 
 def _get_sync_store():
@@ -31,6 +32,31 @@ def _require_gh_config():
         click.echo('  repo = "owner/repo"', err=True)
         raise SystemExit(1)
     return config
+
+
+def write_github_config(
+    repo: str,
+    project: str | None = None,
+    *,
+    config_path: Path | None = None,
+) -> Path:
+    """Write the [github] section in purser.toml for the current project."""
+    GitHubConfig(enabled=True, repo=repo, project=project)
+
+    target = config_path or Path("purser.toml")
+    content = target.read_text() if target.exists() else ""
+
+    import re
+
+    content = re.sub(r"\[github\].*?(?=\n\[|\Z)", "", content, flags=re.DOTALL).rstrip()
+
+    gh_section = f'\n\n[github]\nenabled = true\nrepo = "{repo}"\n'
+    if project:
+        gh_section += f'project = "{project}"\n'
+    gh_section += 'conflict_strategy = "local-wins"\n'
+
+    target.write_text(content + gh_section)
+    return target
 
 
 @click.group("gh")
@@ -85,22 +111,7 @@ def gh_attach(repo: str | None, project: str | None) -> None:
         if not project:
             project = None
 
-    # Write to purser.toml
-    config_path = Path("purser.toml")
-    content = config_path.read_text() if config_path.exists() else ""
-
-    # Remove existing [github] section if any
-    import re
-
-    content = re.sub(r"\[github\].*?(?=\n\[|\Z)", "", content, flags=re.DOTALL).rstrip()
-
-    # Append new section
-    gh_section = f'\n\n[github]\nenabled = true\nrepo = "{repo}"\n'
-    if project:
-        gh_section += f'project = "{project}"\n'
-    gh_section += 'conflict_strategy = "local-wins"\n'
-
-    config_path.write_text(content + gh_section)
+    config_path = write_github_config(repo, project)
 
     click.echo(f"\nGitHub integration configured in {config_path}:")
     click.echo(f"  repo = {repo}")

@@ -39,8 +39,22 @@ def cli(ctx: click.Context, use_json: bool) -> None:
 @cli.command()
 @click.option("--check", is_flag=True, help="Check initialization status without modifying")
 @click.option("--force", is_flag=True, help="Force re-initialization")
+@click.option(
+    "--with-github",
+    is_flag=True,
+    help="Configure optional GitHub repo/project coordination after local setup",
+)
+@click.option("--repo", default=None, help="GitHub repo (owner/repo) for --with-github")
+@click.option("--project", default=None, help="GitHub Project name or number for --with-github")
 @click.pass_context
-def init(ctx: click.Context, check: bool, force: bool) -> None:
+def init(
+    ctx: click.Context,
+    check: bool,
+    force: bool,
+    with_github: bool,
+    repo: str | None,
+    project: str | None,
+) -> None:
     """Initialize purser in the current project.
 
     Creates the directory structure, initializes DuckDB for memory,
@@ -81,11 +95,13 @@ def init(ctx: click.Context, check: bool, force: bool) -> None:
     click.echo(f"Initialized: {config.memory_db}")
 
     # Init beads
+    beads_ok = False
     try:
         from purser.beads import init_beads
 
         init_beads()
         click.echo("Initialized: beads (issue tracking)")
+        beads_ok = True
     except FileNotFoundError:
         click.echo("Warning: bd CLI not found. Beads not initialized.", err=True)
         click.echo("  Install: brew install beads", err=True)
@@ -93,16 +109,28 @@ def init(ctx: click.Context, check: bool, force: bool) -> None:
     except Exception as e:
         click.echo(f"Warning: beads init failed: {e}", err=True)
 
+    gh_configured = False
+    if with_github:
+        gh_configured = _configure_github_during_init(repo=repo, project=project)
+
     # Check for recommended tools
     _check_recommended_tools()
 
     click.echo()
     click.echo("Purser initialized successfully!")
     click.echo(f"  Memory DB: {config.memory_db}")
+    click.echo(f"  Specs dir: {config.specs_dir}")
+    click.echo(f"  Formulas dir: {config.formulas_dir}")
+    click.echo(f"  Beads repo: {'ready' if beads_ok or _beads_repo_initialized() else 'not initialized'}")
+    click.echo(f"  GitHub integration: {'configured' if gh_configured else _github_summary(config)}")
     click.echo()
     click.echo("Next steps:")
-    click.echo('  purser spec add "Your feature description"')
-    click.echo("  purser work next  # See available work")
+    click.echo("  purser init --check")
+    if gh_configured:
+        click.echo("  purser gh sync")
+    else:
+        click.echo('  purser spec add "Your feature description"')
+        click.echo("  purser work next  # See available work")
 
 
 def _is_initialized(config) -> bool:
@@ -114,11 +142,65 @@ def _is_initialized(config) -> bool:
     )
 
 
+def _beads_repo_initialized() -> bool:
+    """Check whether the current repo appears to have local Beads state."""
+    return Path(".beads").exists()
+
+
+def _github_summary(config) -> str:
+    """Summarize configured GitHub state for init output."""
+    if not config.github.enabled:
+        return "not configured"
+    repo = config.github.repo or "repo missing"
+    project = f", project={config.github.project}" if config.github.project else ""
+    return f"enabled ({repo}{project})"
+
+
+def _configure_github_during_init(repo: str | None, project: str | None) -> bool:
+    """Optionally attach GitHub configuration during init."""
+    from purser.gh.cli import GhAvailability, check_gh_availability, detect_default_repo
+    from purser.gh.commands import write_github_config
+
+    gh_avail = check_gh_availability()
+    if gh_avail == GhAvailability.NOT_INSTALLED:
+        click.echo("Warning: gh CLI not installed. Skipping GitHub configuration.", err=True)
+        click.echo("  Install: https://cli.github.com/", err=True)
+        return False
+    if gh_avail == GhAvailability.NOT_AUTHENTICATED:
+        click.echo("Warning: gh CLI not authenticated. Skipping GitHub configuration.", err=True)
+        click.echo("  Run: gh auth login", err=True)
+        return False
+
+    resolved_repo = repo or detect_default_repo()
+    if not resolved_repo:
+        resolved_repo = click.prompt("GitHub repo (owner/repo)")
+
+    resolved_project = project
+    if project is None:
+        prompted = click.prompt(
+            "GitHub Project (name or number, leave empty to skip)",
+            default="",
+            show_default=False,
+        )
+        resolved_project = prompted or None
+
+    config_path = write_github_config(resolved_repo, resolved_project)
+    click.echo(f"Configured: GitHub integration in {config_path}")
+    click.echo(f"  Repository: {resolved_repo}")
+    if resolved_project:
+        click.echo(f"  Project: {resolved_project}")
+    click.echo("  Next: purser gh sync")
+    return True
+
+
 def _check_init_status(config) -> None:
     """Report initialization status."""
     import shutil
 
+    from purser.gh.cli import check_gh_availability
+
     click.echo("Purser initialization status:")
+    click.echo(f"  Config file: {_find_config_path() or 'implicit defaults only'}")
     click.echo(
         f"  Memory DB directory: {'✓' if config.memory_db.parent.exists() else '✗'} {config.memory_db.parent}"
     )
@@ -132,6 +214,24 @@ def _check_init_status(config) -> None:
     click.echo(
         f"  Beads CLI: {'✓' if shutil.which('bd') else '✗'} {shutil.which('bd') or 'not found'}"
     )
+    click.echo(f"  Beads repo: {'✓' if _beads_repo_initialized() else '✗'} .beads")
+    gh_cli = check_gh_availability()
+    click.echo(f"  gh CLI: {gh_cli.value}")
+    click.echo(f"  GitHub integration: {'enabled' if config.github.enabled else 'disabled'}")
+    if config.github.repo:
+        click.echo(f"  GitHub repo: {config.github.repo}")
+    if config.github.project:
+        click.echo(f"  GitHub project: {config.github.project}")
+    gh_sync_db = Path(".purser/gh_sync.duckdb")
+    click.echo(f"  GitHub sync DB: {'✓' if gh_sync_db.exists() else '✗'} {gh_sync_db}")
+
+
+def _find_config_path() -> str | None:
+    """Return the first config file path in use, if present."""
+    for name in ("purser.toml", ".purser/config.toml"):
+        if Path(name).exists():
+            return name
+    return None
 
 
 def _check_recommended_tools() -> None:
