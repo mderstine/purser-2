@@ -586,6 +586,70 @@ def launch_vscode(ctx: click.Context, output_dir: Path, force: bool) -> None:
     click.echo("  3. Run /purser-build-all to start the Ralph loop")
 
 
+@launch.command("claude")
+@click.option(
+    "--output-dir",
+    default=".",
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Workspace directory to scaffold (default: current directory)",
+)
+@click.option("--force", is_flag=True, help="Overwrite existing scaffolded files")
+@click.pass_context
+def launch_claude(ctx: click.Context, output_dir: Path, force: bool) -> None:
+    """Scaffold Claude Code command, agent, and docs files for Purser."""
+    from purser.launch import generate_claude_workspace
+
+    written = generate_claude_workspace(workspace_root=output_dir, force=force)
+
+    if ctx.obj.get("json"):
+        _json_out({"written": [str(path) for path in written]}, True)
+        return
+
+    if written:
+        click.echo(f"Scaffolded {len(written)} Claude Code Purser file(s):")
+        for path in written:
+            click.echo(f"  {path}")
+    else:
+        click.echo("No files written. Use --force to overwrite existing scaffolding.")
+
+    click.echo()
+    click.echo("Next steps:")
+    click.echo("  1. Open Claude Code in this workspace")
+    click.echo("  2. Run /purser-build-all to start the Ralph loop")
+
+
+@launch.command("codex")
+@click.option(
+    "--output-dir",
+    default=".",
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Workspace directory to scaffold (default: current directory)",
+)
+@click.option("--force", is_flag=True, help="Overwrite existing scaffolded files")
+@click.pass_context
+def launch_codex(ctx: click.Context, output_dir: Path, force: bool) -> None:
+    """Scaffold Codex skill and docs files for Purser."""
+    from purser.launch import generate_codex_workspace
+
+    written = generate_codex_workspace(workspace_root=output_dir, force=force)
+
+    if ctx.obj.get("json"):
+        _json_out({"written": [str(path) for path in written]}, True)
+        return
+
+    if written:
+        click.echo(f"Scaffolded {len(written)} Codex Purser file(s):")
+        for path in written:
+            click.echo(f"  {path}")
+    else:
+        click.echo("No files written. Use --force to overwrite existing scaffolding.")
+
+    click.echo()
+    click.echo("Next steps:")
+    click.echo("  1. Open Codex in this workspace")
+    click.echo("  2. Invoke the `purser-build-all` skill or ask Codex to run the Purser Ralph loop")
+
+
 @launch.command("instructions")
 @click.argument("role", type=click.Choice(["pm", "worker"]))
 @click.option(

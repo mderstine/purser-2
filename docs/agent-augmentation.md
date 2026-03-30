@@ -92,8 +92,10 @@ While looping:
 
 ## Codex CLI
 
-Codex does not use VS Code prompt files or hooks, but it can follow the exact same
-workflow from `AGENTS.md` and terminal commands:
+Codex does not use VS Code prompt files or hooks. The closest portable equivalent is
+repo-local skills generated under `.codex/skills`, sourced from the same Purser command
+definitions as the VS Code and Claude files. Codex still follows the workflow from
+`AGENTS.md` and terminal commands:
 
 1. Run `bd prime`
 2. Run `bd ready`
@@ -111,8 +113,9 @@ Apply the same GitHub rule: if the repo is configured for GitHub sync, use `purs
 ## Claude Code
 
 Claude Code can use the same `AGENTS.md` instructions and the same `bd`/`purser`
-commands. If you want persona-level reuse, mirror the VS Code agents into
-`.claude/agents`, but the workflow does not depend on that. The key idea is the same:
+commands. Purser can scaffold host-native Claude files in `.claude/commands` and
+`.claude/agents`, sourced from the same command definitions as VS Code prompts and
+Codex skills. The key idea is the same:
 Purser owns project state, while Claude owns execution inside the current session.
 
 ## Design Boundary

@@ -13,6 +13,17 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+COMMAND_SPECS: tuple[dict[str, str], ...] = (
+    {
+        "name": "purser-build-all",
+        "description": "Execute a Purser Ralph loop over all ready beads.",
+        "argument_hint": (
+            'Optional scope guardrails, for example "stop after frontend work" '
+            'or "only docs and tests".'
+        ),
+    },
+)
+
 
 def _write_text(path: Path, content: str, *, force: bool = False) -> bool:
     """Write a file if it is missing, or overwrite when force is enabled."""
@@ -124,6 +135,59 @@ def generate_vscode_workspace(
         / "purser_post_tool_hook.py": _vscode_post_tool_hook_script(),
         workspace_root / "docs" / "agent-augmentation.md": _agent_augmentation_doc(),
     }
+
+    written: list[Path] = []
+    for path, content in files.items():
+        if _write_text(path, content, force=force):
+            written.append(path)
+
+    return written
+
+
+def generate_claude_workspace(
+    *,
+    workspace_root: Path,
+    force: bool = False,
+) -> list[Path]:
+    """Scaffold Claude Code command and agent files for Purser workflows."""
+    files: dict[Path, str] = {
+        workspace_root / ".claude" / "agents" / "purser-worker.md": _claude_worker_agent(),
+        workspace_root / ".claude" / "agents" / "purser-build-all.md": _claude_build_all_agent(),
+        workspace_root / "docs" / "agent-augmentation.md": _agent_augmentation_doc(),
+    }
+    for command in COMMAND_SPECS:
+        files[
+            workspace_root
+            / ".claude"
+            / "commands"
+            / f"{command['name']}.md"
+        ] = _claude_command(command)
+
+    written: list[Path] = []
+    for path, content in files.items():
+        if _write_text(path, content, force=force):
+            written.append(path)
+
+    return written
+
+
+def generate_codex_workspace(
+    *,
+    workspace_root: Path,
+    force: bool = False,
+) -> list[Path]:
+    """Scaffold Codex skill files that mirror the shared Purser commands."""
+    files: dict[Path, str] = {
+        workspace_root / "docs" / "agent-augmentation.md": _agent_augmentation_doc(),
+    }
+    for command in COMMAND_SPECS:
+        files[
+            workspace_root
+            / ".codex"
+            / "skills"
+            / command["name"]
+            / "SKILL.md"
+        ] = _codex_skill(command)
 
     written: list[Path] = []
     for path, content in files.items():
@@ -268,16 +332,20 @@ def _tool_preamble(tool: str) -> str:
         return (
             "Host environment: Codex CLI.\n\n"
             "Treat Purser as the workflow engine and the Codex session as the "
-            "executor. Use `bd` and `purser` commands directly from the terminal, "
-            "and emulate the Ralph loop manually: pick a ready bead, complete it, "
-            "lint/test, close it, then continue with the next ready bead."
+            "executor. Use repo-local skills in `.codex/skills` as the reusable "
+            "command equivalents, then run the underlying `bd` and `purser` "
+            "commands directly from the terminal. Codex does not have the same "
+            "native slash-command registry as VS Code or Claude, so emulate the "
+            "Ralph loop manually: pick a ready bead, complete it, lint/test, "
+            "close it, then continue with the next ready bead."
         )
     if tool == "claude":
         return (
             "Host environment: Claude Code.\n\n"
-            "Use `AGENTS.md` plus optional `.claude/agents` files for persona-level "
-            "guidance. Run the same Purser and `bd` commands directly; Claude Code "
-            "does not need Purser to own the agent loop to follow the workflow."
+            "Use `AGENTS.md`, `.claude/agents`, and `.claude/commands` for the "
+            "host-native command surface. Run the same Purser and `bd` commands "
+            "directly; Claude Code does not need Purser to own the agent loop to "
+            "follow the workflow."
         )
     return (
         "Host environment: generic external agent.\n\n"
@@ -360,17 +428,128 @@ Rules:
 
 
 def _vscode_build_all_prompt() -> str:
-    return """\
+    command = COMMAND_SPECS[0]
+    return f"""\
 ---
-name: purser-build-all
-description: Execute a Purser Ralph loop over all ready beads.
-argument-hint: Optional scope guardrails, for example "stop after frontend work" or "only docs and tests".
+name: {command["name"]}
+description: {command["description"]}
+argument-hint: {command["argument_hint"]}
 agent: Purser Build All
 tools: ['editFiles', 'runCommands', 'terminalLastCommand', 'changes', 'problems', 'search']
 ---
 Run a Purser Ralph loop in this workspace.
 
 Before you start, load [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md).
+
+Execution policy:
+
+- Work only from the Beads queue.
+- If GitHub integration is enabled, check `purser gh status` at the start and sync before and after the batch as needed.
+- Repeatedly run `bd ready`, claim one bead, complete it, lint/test, close it, and move to the next ready bead.
+- Keep going until no safe ready beads remain.
+- Use `bd` as the authoritative work record; use `purser memory` only for reusable context and learnings worth carrying across sessions.
+- If you stop because the queue is blocked, explain exactly which bead blocked progress and what follow-up is needed.
+- End with a compact report of:
+  - completed beads
+  - blocked or deferred beads
+  - discoveries filed
+  - commands/tests run
+"""
+
+
+def _claude_worker_agent() -> str:
+    return """\
+# Purser Worker
+
+Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md) as standing instructions.
+
+Operate as a single-bead worker:
+
+1. Run `bd prime` when you need current workflow context.
+2. If GitHub integration is enabled, run `purser gh status` and sync as needed before starting.
+3. Accept a specific bead ID if one is provided; otherwise run `bd ready`.
+4. Claim exactly one bead with `bd update <id> --claim`.
+5. Read the issue details with `bd show <id>`.
+6. Implement only the scoped work for that bead.
+7. Run quality gates before closing the bead.
+8. Close the bead with `bd close <id> --reason "<what changed>"`.
+9. If GitHub integration is enabled, sync the changed work state back to GitHub.
+
+Do not create ad hoc TODO files. Use `bd` for task tracking. Do not stop with unpushed work.
+Use `bd` as the work record. Use `purser memory store/query` only for reusable decisions, learnings, failed approaches, or context that should help later agents.
+"""
+
+
+def _claude_build_all_agent() -> str:
+    return """\
+# Purser Build All
+
+Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md) as standing instructions.
+
+You are running a Ralph loop over the ready bead queue.
+
+Loop contract:
+
+1. If GitHub integration is enabled, run `purser gh status` and sync before starting the batch if needed.
+2. Run `bd ready` and pick the highest-priority ready bead.
+3. Claim it with `bd update <id> --claim`.
+4. Read it with `bd show <id>`.
+5. Implement the bead completely, staying within scope.
+6. Run relevant quality gates.
+7. Close it with `bd close <id> --reason "<what changed>"`.
+8. If GitHub integration is enabled, sync the changed work state back to GitHub.
+9. Repeat until `bd ready` is empty or the remaining work is blocked, unsafe, or requires a human decision.
+
+Rules:
+
+- Work through beads sequentially, one claimed bead at a time.
+- If you discover unrelated work, file a new bead instead of expanding scope.
+- Summarize completed, blocked, and newly discovered work before finishing.
+- Do not stop early just because one bead completed; continue until the queue is exhausted or there is a clear blocker.
+- Keep work state in `bd`. Store DuckDB memory only for reusable decisions, learnings, failed approaches, or context that should help future narrower sessions.
+"""
+
+
+def _claude_command(command: dict[str, str]) -> str:
+    return f"""\
+Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md) before you start.
+
+Arguments: {command["argument_hint"]}
+
+Run a Purser Ralph loop in this workspace.
+
+Execution policy:
+
+- Work only from the Beads queue.
+- If GitHub integration is enabled, check `purser gh status` at the start and sync before and after the batch as needed.
+- Repeatedly run `bd ready`, claim one bead, complete it, lint/test, close it, and move to the next ready bead.
+- Keep going until no safe ready beads remain.
+- Use `bd` as the authoritative work record; use `purser memory` only for reusable context and learnings worth carrying across sessions.
+- If you stop because the queue is blocked, explain exactly which bead blocked progress and what follow-up is needed.
+- End with a compact report of:
+  - completed beads
+  - blocked or deferred beads
+  - discoveries filed
+  - commands/tests run
+"""
+
+
+def _codex_skill(command: dict[str, str]) -> str:
+    return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+---
+
+# {command["name"]}
+
+Use this skill when the user wants the Codex equivalent of `/{command["name"]}`.
+
+Arguments: {command["argument_hint"]}
+
+Follow [../../../AGENTS.md](../../../AGENTS.md) and [../../../docs/agent-augmentation.md](../../../docs/agent-augmentation.md).
+
+Run a Purser Ralph loop in this workspace.
 
 Execution policy:
 
@@ -583,8 +762,10 @@ While looping:
 
 ## Codex CLI
 
-Codex does not use VS Code prompt files or hooks, but it can follow the exact same
-workflow from `AGENTS.md` and terminal commands:
+Codex does not use VS Code prompt files or hooks. The closest portable equivalent is
+repo-local skills generated under `.codex/skills`, sourced from the same Purser command
+definitions as the VS Code and Claude files. Codex still follows the workflow from
+`AGENTS.md` and terminal commands:
 
 1. Run `bd prime`
 2. Run `bd ready`
@@ -601,8 +782,9 @@ Apply the same memory rule: Beads for work state, DuckDB for reusable context.
 ## Claude Code
 
 Claude Code can use the same `AGENTS.md` instructions and the same `bd`/`purser`
-commands. If you want persona-level reuse, mirror the VS Code agents into
-`.claude/agents`, but the workflow does not depend on that. The key idea is the same:
+commands. Purser can scaffold host-native Claude files in `.claude/commands` and
+`.claude/agents`, sourced from the same command definitions as VS Code prompts and
+Codex skills. The key idea is the same:
 Purser owns project state, while Claude owns execution inside the current session.
 
 ## Design Boundary

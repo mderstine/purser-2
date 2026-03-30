@@ -80,6 +80,8 @@ To scaffold the same setup into another repo:
 
 ```bash
 purser launch vscode
+purser launch claude
+purser launch codex
 ```
 
 Then enable:
@@ -97,8 +99,10 @@ and sync before and after a larger work batch.
 
 ## Codex CLI
 
-Codex does not use VS Code prompt files, but it works well with Purser because the
-framework is CLI-first. Codex should treat Purser as the workflow engine:
+Codex does not use VS Code prompt files. In this repo, the closest equivalent is a
+repo-local skill scaffolded under [`.codex/skills/purser-build-all/SKILL.md`](/home/md/src/repos/purser-2/.codex/skills/purser-build-all/SKILL.md),
+kept consistent with the VS Code and Claude variants from the same generator code.
+Codex should still treat Purser as the workflow engine:
 
 ```bash
 bd prime
@@ -116,10 +120,15 @@ If GitHub integration is enabled, Codex should also run `purser gh status` at se
 
 ## Claude Code
 
-Claude Code uses the same Purser and Beads commands. `AGENTS.md` remains the shared
-workspace instruction source, and you can mirror the VS Code personas into
-`.claude/agents` if you want tool-specific ergonomics. The workflow itself does not
-change. If GitHub integration is enabled, Claude Code should follow the same sync policy.
+Claude Code uses the same Purser and Beads commands, plus host-native files in:
+
+- [`.claude/commands/purser-build-all.md`](/home/md/src/repos/purser-2/.claude/commands/purser-build-all.md)
+- [`.claude/agents/purser-build-all.md`](/home/md/src/repos/purser-2/.claude/agents/purser-build-all.md)
+- [`.claude/agents/purser-worker.md`](/home/md/src/repos/purser-2/.claude/agents/purser-worker.md)
+
+Those are generated from the same shared command definitions as the VS Code prompt and
+Codex skill so the behavior stays aligned. If GitHub integration is enabled, Claude Code
+should follow the same sync policy.
 
 ## Tool-Specific Instructions
 
