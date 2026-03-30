@@ -33,7 +33,11 @@ def test_generate_vscode_workspace(tmp_path: Path) -> None:
 
     assert ".github/agents/purser-worker.agent.md" in paths
     assert ".github/agents/purser-build-all.agent.md" in paths
+    assert ".github/prompts/purser-add-spec.prompt.md" in paths
+    assert ".github/prompts/purser-build.prompt.md" in paths
     assert ".github/prompts/purser-build-all.prompt.md" in paths
+    assert ".github/prompts/purser-init.prompt.md" in paths
+    assert ".github/prompts/purser-plan.prompt.md" in paths
     assert "scripts/vscode/purser_stop_hook.py" in paths
     assert "scripts/vscode/purser_post_tool_hook.py" in paths
     assert "docs/agent-augmentation.md" in paths
@@ -41,6 +45,9 @@ def test_generate_vscode_workspace(tmp_path: Path) -> None:
     prompt = (tmp_path / ".github" / "prompts" / "purser-build-all.prompt.md").read_text()
     assert "agent: Purser Build All" in prompt
     assert "Ralph loop" in prompt
+
+    init_prompt = (tmp_path / ".github" / "prompts" / "purser-init.prompt.md").read_text()
+    assert "uv run purser init --check" in init_prompt
 
     stop_hook = (tmp_path / "scripts" / "vscode" / "purser_stop_hook.py").read_text()
     assert "stop_hook_active" in stop_hook
@@ -53,21 +60,35 @@ def test_generate_claude_workspace(tmp_path: Path) -> None:
 
     assert ".claude/agents/purser-worker.md" in paths
     assert ".claude/agents/purser-build-all.md" in paths
+    assert ".claude/commands/purser-add-spec.md" in paths
+    assert ".claude/commands/purser-build.md" in paths
     assert ".claude/commands/purser-build-all.md" in paths
+    assert ".claude/commands/purser-init.md" in paths
+    assert ".claude/commands/purser-plan.md" in paths
     assert "docs/agent-augmentation.md" in paths
 
     command = (tmp_path / ".claude" / "commands" / "purser-build-all.md").read_text()
     assert "Run a Purser Ralph loop in this workspace." in command
     assert "commands/tests run" in command
 
+    add_spec = (tmp_path / ".claude" / "commands" / "purser-add-spec.md").read_text()
+    assert "uv run purser spec add" in add_spec
+
 
 def test_generate_codex_workspace(tmp_path: Path) -> None:
     written = generate_codex_workspace(workspace_root=tmp_path)
     paths = {path.relative_to(tmp_path).as_posix() for path in written}
 
+    assert ".codex/skills/purser-add-spec/SKILL.md" in paths
+    assert ".codex/skills/purser-build/SKILL.md" in paths
     assert ".codex/skills/purser-build-all/SKILL.md" in paths
+    assert ".codex/skills/purser-init/SKILL.md" in paths
+    assert ".codex/skills/purser-plan/SKILL.md" in paths
     assert "docs/agent-augmentation.md" in paths
 
     skill = (tmp_path / ".codex" / "skills" / "purser-build-all" / "SKILL.md").read_text()
     assert "Use this skill when the user wants the Codex equivalent" in skill
     assert "Run a Purser Ralph loop" in skill
+
+    plan_skill = (tmp_path / ".codex" / "skills" / "purser-plan" / "SKILL.md").read_text()
+    assert "uv run purser plan create" in plan_skill

@@ -7,7 +7,6 @@ interaction, and applying changes. Purser adds:
 - decomposition via `purser plan ...`
 - queueing and state via `bd`
 - memory via `purser memory ...`
-- quality checks via `purser lint`
 
 ## Work Record vs Memory
 
@@ -20,24 +19,7 @@ Practical rule:
 
 - If it changes the task graph or project state, put it in Beads.
 - If it captures reusable understanding, put it in DuckDB memory.
-
-## GitHub Sync
-
-When Purser GitHub integration is enabled, agents are expected to keep GitHub in sync
-with the Beads work graph.
-
-Use:
-
-- `purser gh status` to inspect configuration and current sync state
-- `purser gh sync` for normal bidirectional synchronization
-- `purser gh push` when local Beads changes are authoritative and should be published
-- `purser gh pull` when remote GitHub changes should be imported locally
-
-Operational rule:
-
-- Check GitHub sync state at session start.
-- Sync before a larger autonomous batch if local and remote may have diverged.
-- Sync again after changing work state so GitHub Issues and Project items stay current.
+- quality checks via `purser lint`
 
 ## Ralph Loop
 
@@ -51,7 +33,6 @@ In Purser terms, a Ralph loop means:
 6. Repeat until no safe ready beads remain
 
 Memory is not a mandatory loop step. Store memory only when it would materially help a later bead or later session.
-When GitHub integration is enabled, sync is part of the loop boundary even though it does not replace Beads as the source of truth.
 
 ## VS Code
 
@@ -67,7 +48,11 @@ This repository ships a VS Code implementation:
 
 - `.github/agents/purser-worker.agent.md`
 - `.github/agents/purser-build-all.agent.md`
+- `.github/prompts/purser-add-spec.prompt.md`
+- `.github/prompts/purser-build.prompt.md`
 - `.github/prompts/purser-build-all.prompt.md`
+- `.github/prompts/purser-init.prompt.md`
+- `.github/prompts/purser-plan.prompt.md`
 - `scripts/vscode/purser_stop_hook.py`
 - `scripts/vscode/purser_post_tool_hook.py`
 
@@ -80,22 +65,27 @@ Recommended settings to enable the full workflow:
 }
 ```
 
-Use `/purser-build-all` from chat or a background agent session when you want the
-agent to keep draining the ready queue.
+Use `/purser-add-spec`, `/purser-build`, `/purser-build-all`, `/purser-init`, and
+`/purser-plan` from chat as the VS Code command surface for the shared Purser workflow.
 
 While looping:
 
 - Keep work state in `bd`
 - Store DuckDB memory only for non-obvious decisions, learnings, blockers, failed attempts, or context that should survive a narrower future session
-- Check `purser gh status` at the start of a session when GitHub integration is enabled
-- Run `purser gh sync` before and after a larger autonomous batch so GitHub stays aligned with Beads
 
 ## Codex CLI
 
 Codex does not use VS Code prompt files or hooks. The closest portable equivalent is
 repo-local skills generated under `.codex/skills`, sourced from the same Purser command
-definitions as the VS Code and Claude files. Codex still follows the workflow from
-`AGENTS.md` and terminal commands:
+definitions as the VS Code and Claude files. The shared Codex-equivalent command set is:
+
+- `purser-add-spec`
+- `purser-build`
+- `purser-build-all`
+- `purser-init`
+- `purser-plan`
+
+Codex still follows the workflow from `AGENTS.md` and terminal commands:
 
 1. Run `bd prime`
 2. Run `bd ready`
@@ -108,7 +98,6 @@ definitions as the VS Code and Claude files. Codex still follows the workflow fr
 The loop is procedural rather than hook-driven, but the behavior is the same.
 
 Apply the same memory rule: Beads for work state, DuckDB for reusable context.
-Apply the same GitHub rule: if the repo is configured for GitHub sync, use `purser gh ...` as part of the normal session workflow.
 
 ## Claude Code
 

@@ -15,12 +15,32 @@ from typing import Any
 
 COMMAND_SPECS: tuple[dict[str, str], ...] = (
     {
+        "name": "purser-add-spec",
+        "description": "Create a new structured Purser spec from a feature description.",
+        "argument_hint": "Provide the feature description or requirement to turn into a spec.",
+    },
+    {
+        "name": "purser-build",
+        "description": "Claim and build the next ready bead from the queue.",
+        "argument_hint": "Optional bead ID or scope guardrails if you do not want the default next ready item.",
+    },
+    {
         "name": "purser-build-all",
         "description": "Execute a Purser Ralph loop over all ready beads.",
         "argument_hint": (
             'Optional scope guardrails, for example "stop after frontend work" '
             'or "only docs and tests".'
         ),
+    },
+    {
+        "name": "purser-init",
+        "description": "Initialize Purser in the current repository and report setup status.",
+        "argument_hint": "Optional flags or intent, for example check-only, force re-init, or with GitHub setup.",
+    },
+    {
+        "name": "purser-plan",
+        "description": "Decompose one or more specs into Beads work items.",
+        "argument_hint": "Optional spec ID; if omitted, plan the relevant unplanned specs.",
     },
 )
 
@@ -124,10 +144,6 @@ def generate_vscode_workspace(
         / ".github"
         / "agents"
         / "purser-build-all.agent.md": _vscode_build_all_agent(),
-        workspace_root
-        / ".github"
-        / "prompts"
-        / "purser-build-all.prompt.md": _vscode_build_all_prompt(),
         workspace_root / "scripts" / "vscode" / "purser_stop_hook.py": _vscode_stop_hook_script(),
         workspace_root
         / "scripts"
@@ -135,6 +151,13 @@ def generate_vscode_workspace(
         / "purser_post_tool_hook.py": _vscode_post_tool_hook_script(),
         workspace_root / "docs" / "agent-augmentation.md": _agent_augmentation_doc(),
     }
+    for command in COMMAND_SPECS:
+        files[
+            workspace_root
+            / ".github"
+            / "prompts"
+            / f"{command['name']}.prompt.md"
+        ] = _vscode_prompt(command)
 
     written: list[Path] = []
     for path, content in files.items():
@@ -427,8 +450,14 @@ Rules:
 """
 
 
-def _vscode_build_all_prompt() -> str:
-    command = COMMAND_SPECS[0]
+def _find_command(name: str) -> dict[str, str]:
+    for command in COMMAND_SPECS:
+        if command["name"] == name:
+            return command
+    raise KeyError(name)
+
+
+def _vscode_build_all_prompt(command: dict[str, str]) -> str:
     return f"""\
 ---
 name: {command["name"]}
@@ -455,6 +484,91 @@ Execution policy:
   - discoveries filed
   - commands/tests run
 """
+
+
+def _vscode_prompt(command: dict[str, str]) -> str:
+    if command["name"] == "purser-build-all":
+        return _vscode_build_all_prompt(command)
+    if command["name"] == "purser-build":
+        return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+argument-hint: {command["argument_hint"]}
+agent: Purser Worker
+tools: ['editFiles', 'runCommands', 'terminalLastCommand', 'changes', 'problems', 'search']
+---
+Claim and execute exactly one ready bead in this workspace.
+
+Before you start, load [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md).
+
+Execution policy:
+
+- If a bead ID is provided, respect it. Otherwise run `bd ready` and pick the top safe ready bead.
+- Claim the bead with `bd update <id> --claim` before starting work.
+- Read the issue with `bd show <id>`, implement only that scope, run relevant quality gates, and close it with `bd close <id> --reason "<what changed>"`.
+- If GitHub integration is enabled, check `purser gh status` at the start and sync changed work state back as needed.
+- End with the claimed bead ID, what changed, and what tests or lint commands ran.
+"""
+    if command["name"] == "purser-add-spec":
+        return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+argument-hint: {command["argument_hint"]}
+tools: ['runCommands', 'terminalLastCommand', 'search']
+---
+Create a new Purser spec from the user-provided description.
+
+Before you start, load [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md).
+
+Execution policy:
+
+- Run `uv run purser spec add "<description>"` using the user-provided requirement text.
+- If the requirement text is in a file, inspect it first, then feed the relevant description into `purser spec add`.
+- Report the created spec ID, title, and file path.
+- Offer the follow-up command to inspect or plan it next.
+"""
+    if command["name"] == "purser-init":
+        return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+argument-hint: {command["argument_hint"]}
+tools: ['runCommands', 'terminalLastCommand']
+---
+Initialize Purser in this repository or report its current setup status.
+
+Before you start, load [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md).
+
+Execution policy:
+
+- Use `uv run purser init` for normal setup.
+- Use `uv run purser init --check` when the user wants status without modifying anything.
+- Use `uv run purser init --force` only when the user explicitly asks to reinitialize.
+- If the user wants GitHub coordination during setup, use `uv run purser init --with-github` plus `--repo` and `--project` when available.
+- Report memory DB, specs directory, formulas directory, Beads status, and GitHub status.
+"""
+    if command["name"] == "purser-plan":
+        return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+argument-hint: {command["argument_hint"]}
+tools: ['runCommands', 'terminalLastCommand', 'search']
+---
+Decompose specs into Beads work items.
+
+Before you start, load [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md).
+
+Execution policy:
+
+- If the user gives a spec ID, run `uv run purser plan create <spec_id>`.
+- Otherwise inspect available specs with `uv run purser spec list`, choose the relevant unplanned spec, and run `uv run purser plan create <spec_id>`.
+- Report the created epic, feature, and task IDs.
+- If the planner output looks incomplete or malformed, say so explicitly instead of pretending the plan is detailed.
+"""
+    raise KeyError(command["name"])
 
 
 def _claude_worker_agent() -> str:
@@ -511,6 +625,77 @@ Rules:
 
 
 def _claude_command(command: dict[str, str]) -> str:
+    if command["name"] == "purser-build-all":
+        return f"""\
+Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md) before you start.
+
+Arguments: {command["argument_hint"]}
+
+Run a Purser Ralph loop in this workspace.
+
+Execution policy:
+
+- Work only from the Beads queue.
+- If GitHub integration is enabled, check `purser gh status` at the start and sync before and after the batch as needed.
+- Repeatedly run `bd ready`, claim one bead, complete it, lint/test, close it, and move to the next ready bead.
+- Keep going until no safe ready beads remain.
+- Use `bd` as the authoritative work record; use `purser memory` only for reusable context and learnings worth carrying across sessions.
+- If you stop because the queue is blocked, explain exactly which bead blocked progress and what follow-up is needed.
+- End with a compact report of:
+  - completed beads
+  - blocked or deferred beads
+  - discoveries filed
+  - commands/tests run
+"""
+    if command["name"] == "purser-build":
+        return f"""\
+Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md) before you start.
+
+Arguments: {command["argument_hint"]}
+
+Claim and execute exactly one ready bead.
+
+- Run `bd ready --limit 1` unless the user names a specific bead.
+- Claim the bead with `bd update <id> --claim`, inspect it with `bd show <id>`, implement only that scope, run relevant quality gates, and close it.
+- End with the bead ID, what changed, and the validation commands that ran.
+"""
+    if command["name"] == "purser-add-spec":
+        return f"""\
+Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md) before you start.
+
+Arguments: {command["argument_hint"]}
+
+Create a structured Purser spec from the user-provided requirement text.
+
+- Run `uv run purser spec add "<description>"`.
+- Report the created spec ID, title, and file path.
+- Offer to inspect it with `uv run purser spec show <id>` or plan it with `uv run purser plan create <id>`.
+"""
+    if command["name"] == "purser-init":
+        return f"""\
+Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md) before you start.
+
+Arguments: {command["argument_hint"]}
+
+Initialize Purser in the current repository or report setup status.
+
+- Use `uv run purser init` for normal setup.
+- Use `uv run purser init --check` for status-only requests.
+- Use `uv run purser init --with-github` plus explicit `--repo`/`--project` when the user wants GitHub setup too.
+- Report the resulting local and GitHub status clearly.
+"""
+    if command["name"] == "purser-plan":
+        return f"""\
+Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md) before you start.
+
+Arguments: {command["argument_hint"]}
+
+Decompose one or more specs into Beads work items.
+
+- If the user provides a spec ID, run `uv run purser plan create <spec_id>`.
+- Otherwise list specs with `uv run purser spec list`, choose the relevant one, and run the planner.
+- Report the created epic, feature, and task IDs.
+"""
     return f"""\
 Use [../../AGENTS.md](../../AGENTS.md) and [../../docs/agent-augmentation.md](../../docs/agent-augmentation.md) before you start.
 
@@ -535,6 +720,122 @@ Execution policy:
 
 
 def _codex_skill(command: dict[str, str]) -> str:
+    if command["name"] == "purser-build-all":
+        return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+---
+
+# {command["name"]}
+
+Use this skill when the user wants the Codex equivalent of `/{command["name"]}`.
+
+Arguments: {command["argument_hint"]}
+
+Follow [../../../AGENTS.md](../../../AGENTS.md) and [../../../docs/agent-augmentation.md](../../../docs/agent-augmentation.md).
+
+Run a Purser Ralph loop in this workspace.
+
+Execution policy:
+
+- Work only from the Beads queue.
+- If GitHub integration is enabled, check `purser gh status` at the start and sync before and after the batch as needed.
+- Repeatedly run `bd ready`, claim one bead, complete it, lint/test, close it, and move to the next ready bead.
+- Keep going until no safe ready beads remain.
+- Use `bd` as the authoritative work record; use `purser memory` only for reusable context and learnings worth carrying across sessions.
+- If you stop because the queue is blocked, explain exactly which bead blocked progress and what follow-up is needed.
+- End with a compact report of:
+  - completed beads
+  - blocked or deferred beads
+  - discoveries filed
+  - commands/tests run
+"""
+    if command["name"] == "purser-build":
+        return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+---
+
+# {command["name"]}
+
+Use this skill when the user wants the Codex equivalent of `/{command["name"]}`.
+
+Arguments: {command["argument_hint"]}
+
+Follow [../../../AGENTS.md](../../../AGENTS.md) and [../../../docs/agent-augmentation.md](../../../docs/agent-augmentation.md).
+
+Claim and execute exactly one ready bead.
+
+- Run `bd ready --limit 1` unless the user names a specific bead.
+- Claim the bead, inspect it, implement only that scope, run relevant validation, and close it.
+- Report the bead ID and what changed.
+"""
+    if command["name"] == "purser-add-spec":
+        return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+---
+
+# {command["name"]}
+
+Use this skill when the user wants the Codex equivalent of `/{command["name"]}`.
+
+Arguments: {command["argument_hint"]}
+
+Follow [../../../AGENTS.md](../../../AGENTS.md) and [../../../docs/agent-augmentation.md](../../../docs/agent-augmentation.md).
+
+Create a structured Purser spec from a requirement description.
+
+- Run `uv run purser spec add "<description>"`.
+- Report the created spec ID, title, and file path.
+- Offer the follow-up inspection or planning command.
+"""
+    if command["name"] == "purser-init":
+        return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+---
+
+# {command["name"]}
+
+Use this skill when the user wants the Codex equivalent of `/{command["name"]}`.
+
+Arguments: {command["argument_hint"]}
+
+Follow [../../../AGENTS.md](../../../AGENTS.md) and [../../../docs/agent-augmentation.md](../../../docs/agent-augmentation.md).
+
+Initialize Purser in the current repository or report status.
+
+- Use `uv run purser init` for setup.
+- Use `uv run purser init --check` for status-only requests.
+- Use `uv run purser init --with-github` plus `--repo`/`--project` when GitHub setup is desired.
+- Report local and GitHub setup state clearly.
+"""
+    if command["name"] == "purser-plan":
+        return f"""\
+---
+name: {command["name"]}
+description: {command["description"]}
+---
+
+# {command["name"]}
+
+Use this skill when the user wants the Codex equivalent of `/{command["name"]}`.
+
+Arguments: {command["argument_hint"]}
+
+Follow [../../../AGENTS.md](../../../AGENTS.md) and [../../../docs/agent-augmentation.md](../../../docs/agent-augmentation.md).
+
+Decompose specs into Beads work items.
+
+- If a spec ID is provided, run `uv run purser plan create <spec_id>`.
+- Otherwise list specs, choose the relevant one, and run the planner.
+- Report the created epic, feature, and task IDs.
+"""
     return f"""\
 ---
 name: {command["name"]}
@@ -739,7 +1040,11 @@ This repository ships a VS Code implementation:
 
 - `.github/agents/purser-worker.agent.md`
 - `.github/agents/purser-build-all.agent.md`
+- `.github/prompts/purser-add-spec.prompt.md`
+- `.github/prompts/purser-build.prompt.md`
 - `.github/prompts/purser-build-all.prompt.md`
+- `.github/prompts/purser-init.prompt.md`
+- `.github/prompts/purser-plan.prompt.md`
 - `scripts/vscode/purser_stop_hook.py`
 - `scripts/vscode/purser_post_tool_hook.py`
 
@@ -752,8 +1057,8 @@ Recommended settings to enable the full workflow:
 }
 ```
 
-Use `/purser-build-all` from chat or a background agent session when you want the
-agent to keep draining the ready queue.
+Use `/purser-add-spec`, `/purser-build`, `/purser-build-all`, `/purser-init`, and
+`/purser-plan` from chat as the VS Code command surface for the shared Purser workflow.
 
 While looping:
 
@@ -764,8 +1069,15 @@ While looping:
 
 Codex does not use VS Code prompt files or hooks. The closest portable equivalent is
 repo-local skills generated under `.codex/skills`, sourced from the same Purser command
-definitions as the VS Code and Claude files. Codex still follows the workflow from
-`AGENTS.md` and terminal commands:
+definitions as the VS Code and Claude files. The shared Codex-equivalent command set is:
+
+- `purser-add-spec`
+- `purser-build`
+- `purser-build-all`
+- `purser-init`
+- `purser-plan`
+
+Codex still follows the workflow from `AGENTS.md` and terminal commands:
 
 1. Run `bd prime`
 2. Run `bd ready`

@@ -101,7 +101,11 @@ VS Code is now the strongest augmentation target because it supports:
 
 This repository includes a working scaffold:
 
+- [`.github/prompts/purser-add-spec.prompt.md`](/home/md/src/repos/purser-2/.github/prompts/purser-add-spec.prompt.md)
+- [`.github/prompts/purser-build.prompt.md`](/home/md/src/repos/purser-2/.github/prompts/purser-build.prompt.md)
 - [`.github/prompts/purser-build-all.prompt.md`](/home/md/src/repos/purser-2/.github/prompts/purser-build-all.prompt.md)
+- [`.github/prompts/purser-init.prompt.md`](/home/md/src/repos/purser-2/.github/prompts/purser-init.prompt.md)
+- [`.github/prompts/purser-plan.prompt.md`](/home/md/src/repos/purser-2/.github/prompts/purser-plan.prompt.md)
 - [`.github/agents/purser-build-all.agent.md`](/home/md/src/repos/purser-2/.github/agents/purser-build-all.agent.md)
 - [`.github/agents/purser-worker.agent.md`](/home/md/src/repos/purser-2/.github/agents/purser-worker.agent.md)
 - [`scripts/vscode/purser_stop_hook.py`](/home/md/src/repos/purser-2/scripts/vscode/purser_stop_hook.py)
@@ -124,7 +128,7 @@ Then enable:
 }
 ```
 
-After that, run `/purser-build-all` in VS Code chat or a background agent session.
+After that, run `/purser-add-spec`, `/purser-build`, `/purser-build-all`, `/purser-init`, or `/purser-plan` in VS Code chat as needed.
 If GitHub integration is enabled for the repo, the agent should also check `purser gh status`
 and sync before and after a larger work batch.
 
@@ -153,7 +157,11 @@ If GitHub integration is enabled, Codex should also run `purser gh status` at se
 
 Claude Code uses the same Purser and Beads commands, plus host-native files in:
 
+- [`.claude/commands/purser-add-spec.md`](/home/md/src/repos/purser-2/.claude/commands/purser-add-spec.md)
+- [`.claude/commands/purser-build.md`](/home/md/src/repos/purser-2/.claude/commands/purser-build.md)
 - [`.claude/commands/purser-build-all.md`](/home/md/src/repos/purser-2/.claude/commands/purser-build-all.md)
+- [`.claude/commands/purser-init.md`](/home/md/src/repos/purser-2/.claude/commands/purser-init.md)
+- [`.claude/commands/purser-plan.md`](/home/md/src/repos/purser-2/.claude/commands/purser-plan.md)
 - [`.claude/agents/purser-build-all.md`](/home/md/src/repos/purser-2/.claude/agents/purser-build-all.md)
 - [`.claude/agents/purser-worker.md`](/home/md/src/repos/purser-2/.claude/agents/purser-worker.md)
 
