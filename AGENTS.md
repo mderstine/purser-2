@@ -9,7 +9,8 @@ bd ready              # Find available work
 bd show <id>          # View issue details
 bd update <id> --claim  # Claim work atomically
 bd close <id>         # Complete work
-bd dolt push          # Push beads data to remote
+bd dolt remote list   # Check whether a beads/dolt remote is configured
+bd dolt push          # Push beads data when a dolt remote exists
 ```
 
 ## Non-Interactive Shell Commands
@@ -72,7 +73,8 @@ bd close <id>         # Complete work
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd dolt push
+   bd dolt remote list  # if a dolt remote exists, run bd dolt push
+   bd dolt push         # only when a beads/dolt remote is configured
    git push
    git status  # MUST show "up to date with origin"
    ```
@@ -84,5 +86,6 @@ bd close <id>         # Complete work
 - Work is NOT complete until `git push` succeeds
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
+- Do not treat `bd dolt push` as mandatory in a local-only Beads setup; run it only when `bd dolt remote list` shows a configured remote
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
