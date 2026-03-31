@@ -321,6 +321,7 @@ def gh_sync(dry_run: bool) -> None:
     click.echo("\nSync complete:")
     click.echo(f"  Created: {stats['created']}")
     click.echo(f"  Pushed:  {stats['pushed']}")
+    click.echo(f"  Project items: {stats['project_items']}")
     click.echo(f"  Pulled:  {stats['pulled']}")
     click.echo(f"  Conflicts: {stats['conflicts']}")
 
@@ -340,7 +341,7 @@ def gh_push(dry_run: bool) -> None:
         raise SystemExit(1)
 
     from purser.beads import list_issues as bd_list
-    from purser.gh.sync_engine import push_dirty_issues, push_new_issues
+    from purser.gh.sync_engine import push_dirty_issues, push_new_issues, sync_project_items
 
     store = _get_sync_store()
     issues = bd_list()
@@ -348,9 +349,12 @@ def gh_push(dry_run: bool) -> None:
     click.echo("Pushing to GitHub...")
     created = push_new_issues(issues, config.github, store, dry_run=dry_run)
     updated = push_dirty_issues(issues, config.github, store, dry_run=dry_run)
+    project_items = sync_project_items(issues, config.github, store, dry_run=dry_run)
 
     store.close()
-    click.echo(f"\nPush complete: {created} created, {updated} updated")
+    click.echo(
+        f"\nPush complete: {created} created, {updated} updated, {project_items} project item(s) synced"
+    )
 
 
 @gh_group.command("pull")

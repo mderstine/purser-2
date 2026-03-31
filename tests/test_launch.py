@@ -46,6 +46,18 @@ def test_generate_vscode_workspace(tmp_path: Path) -> None:
     assert "agent: Purser Build All" in prompt
     assert "Ralph loop" in prompt
 
+    add_spec_prompt = (tmp_path / ".github" / "prompts" / "purser-add-spec.prompt.md").read_text()
+    assert "uv run purser spec add" in add_spec_prompt
+    assert "follow-up command to inspect or plan it next" in add_spec_prompt
+
+    plan_prompt = (tmp_path / ".github" / "prompts" / "purser-plan.prompt.md").read_text()
+    assert "uv run purser plan create" in plan_prompt
+    assert "created epic, feature, and task IDs" in plan_prompt
+
+    build_prompt = (tmp_path / ".github" / "prompts" / "purser-build.prompt.md").read_text()
+    assert "Claim and execute exactly one ready bead" in build_prompt
+    assert "bd update <id> --claim" in build_prompt
+
     init_prompt = (tmp_path / ".github" / "prompts" / "purser-init.prompt.md").read_text()
     assert "uv run purser init --check" in init_prompt
 

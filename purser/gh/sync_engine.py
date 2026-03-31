@@ -244,22 +244,28 @@ def push_to_project(
             continue
 
         if dry_run:
-            click.echo(f"  [dry-run] Would add #{state.gh_issue_num} to project")
+            action = "update project fields for" if state.gh_project_id else "add"
+            click.echo(f"  [dry-run] Would {action} #{state.gh_issue_num} to project")
             updated += 1
             continue
 
-        # Get the GH issue node ID for project operations
-        gh_issue = gh_get(repo, state.gh_issue_num)
-        node_id = gh_issue.get("node_id", "")
-        if not node_id:
-            continue
+        item_id = state.gh_project_id
+        already_linked = bool(item_id)
+        if item_id:
+            click.echo(f"  Updated project fields for #{state.gh_issue_num}")
+        else:
+            # Get the GH issue node ID for project operations
+            gh_issue = gh_get(repo, state.gh_issue_num)
+            node_id = gh_issue.get("node_id", "")
+            if not node_id:
+                continue
 
-        # Add to project
-        try:
-            item_id = add_item_to_project(project_id, node_id)
-        except Exception as e:
-            click.echo(f"  Warning: Could not add #{state.gh_issue_num} to project: {e}", err=True)
-            continue
+            # Add to project
+            try:
+                item_id = add_item_to_project(project_id, node_id)
+            except Exception as e:
+                click.echo(f"  Warning: Could not add #{state.gh_issue_num} to project: {e}", err=True)
+                continue
 
         # Update custom fields
         sync_item_fields(
@@ -270,14 +276,60 @@ def push_to_project(
             issue.priority,
         )
 
-        # Store project item ID
+        # Store project item ID for idempotent re-syncs.
         state.gh_project_id = item_id
         sync_store.upsert(state)
 
-        click.echo(f"  Added #{state.gh_issue_num} to project")
+        if not already_linked:
+            click.echo(f"  Added #{state.gh_issue_num} to project")
         updated += 1
 
     return updated
+
+
+def sync_project_items(
+    issues: list[Issue],
+    gh_config: GitHubConfig,
+    sync_store: SyncStore,
+    *,
+    dry_run: bool = False,
+) -> int:
+    """Sync linked GitHub issues into the configured GitHub Project."""
+    repo = gh_config.repo
+    project = gh_config.project
+    if not repo or not project:
+        return 0
+
+    owner = repo.split("/", 1)[0]
+
+    from purser.gh.project_fields import ensure_project_fields
+    from purser.gh.projects import find_project
+
+    project_node = find_project(owner, project)
+    if not project_node:
+        click.echo(
+            f"  Warning: Could not find GitHub Project '{project}' for owner '{owner}'",
+            err=True,
+        )
+        return 0
+
+    project_id = project_node.get("id", "")
+    if not project_id:
+        click.echo(
+            f"  Warning: GitHub Project '{project}' for owner '{owner}' is missing an id",
+            err=True,
+        )
+        return 0
+
+    field_map = {} if dry_run else ensure_project_fields(project_id)
+    return push_to_project(
+        issues,
+        gh_config,
+        sync_store,
+        project_id,
+        field_map,
+        dry_run=dry_run,
+    )
 
 
 def full_sync(
@@ -294,18 +346,18 @@ def full_sync(
     4. Pull remote changes (with conflict detection)
     5. Return summary stats
 
-    Returns dict with keys: created, pushed, pulled, conflicts.
+    Returns dict with keys: created, pushed, project_items, pulled, conflicts.
     """
     from purser.beads import list_issues as bd_list
     from purser.gh.conflict import ChangeClass, classify_change, resolve_conflict
 
     repo = gh_config.repo
     if not repo:
-        return {"created": 0, "pushed": 0, "pulled": 0, "conflicts": 0}
+        return {"created": 0, "pushed": 0, "project_items": 0, "pulled": 0, "conflicts": 0}
 
     issues = bd_list()
     issue_map = {i.id: i for i in issues}
-    stats = {"created": 0, "pushed": 0, "pulled": 0, "conflicts": 0}
+    stats = {"created": 0, "pushed": 0, "project_items": 0, "pulled": 0, "conflicts": 0}
 
     click.echo("Phase 1: Push local changes...")
 
@@ -316,6 +368,15 @@ def full_sync(
     # Find locally-dirty beads
     linked = [i for i in issues if sync_store.get(i.id)]
     stats["pushed"] = push_dirty_issues(linked, gh_config, sync_store, dry_run=dry_run)
+
+    if gh_config.project:
+        click.echo("\nPhase 1b: Sync GitHub Project items...")
+        stats["project_items"] = sync_project_items(
+            issues,
+            gh_config,
+            sync_store,
+            dry_run=dry_run,
+        )
 
     click.echo("\nPhase 2: Pull remote changes...")
 
